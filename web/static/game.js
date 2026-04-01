@@ -22,6 +22,13 @@
     "Radio Codebook": "\u{1F4D7}",
   };
 
+  // NPC portrait mapping
+  const NPC_PORTRAITS = {
+    "dr_vapnik": "assets/dr_vapnik.jpg",
+    "dropout": "assets/agent_dropout.jpg",
+    "cryo_sentinel": "assets/cryo_sentinel.png",
+  };
+
   // Action icon mapping
   const ACTION_ICONS = {
     move: "\u{1F9ED}",
@@ -140,17 +147,17 @@
     if (!container) return;
 
     // Ensure inner bar and label exist
-    let inner = container.querySelector(".dossier-bar__inner");
-    let label = container.querySelector(".dossier-bar__label");
+    let inner = container.querySelector(".dossier-bar__fill");
+    let label = container.querySelector(".dossier-bar__text");
 
     if (!inner) {
       inner = document.createElement("div");
-      inner.className = "dossier-bar__inner";
+      inner.className = "dossier-bar__fill";
       container.appendChild(inner);
     }
     if (!label) {
       label = document.createElement("span");
-      label.className = "dossier-bar__label";
+      label.className = "dossier-bar__text";
       container.appendChild(label);
     }
 
@@ -173,17 +180,17 @@
     const container = document.getElementById("turn-bar");
     if (!container) return;
 
-    let inner = container.querySelector(".turn-bar__inner");
-    let label = container.querySelector(".turn-bar__label");
+    let inner = container.querySelector(".turn-bar__fill");
+    let label = container.querySelector(".turn-bar__text");
 
     if (!inner) {
       inner = document.createElement("div");
-      inner.className = "turn-bar__inner";
+      inner.className = "turn-bar__fill";
       container.appendChild(inner);
     }
     if (!label) {
       label = document.createElement("span");
-      label.className = "turn-bar__label";
+      label.className = "turn-bar__text";
       container.appendChild(label);
     }
 
@@ -211,8 +218,11 @@
     const container = document.getElementById("inventory");
     if (!container) return;
 
-    while (container.firstChild) {
-      container.removeChild(container.firstChild);
+    // Target the .inventory-items child, or fall back to container
+    let target = container.querySelector(".inventory-items") || container;
+
+    while (target.firstChild) {
+      target.removeChild(target.firstChild);
     }
 
     if (!state.inventory || state.inventory.length === 0) {
@@ -220,7 +230,7 @@
       empty.className = "item-slot";
       empty.style.fontStyle = "italic";
       empty.textContent = "Empty";
-      container.appendChild(empty);
+      target.appendChild(empty);
       return;
     }
 
@@ -230,12 +240,12 @@
       const span = document.createElement("span");
       span.className = "item-slot";
       span.textContent = icon + " " + name;
-      container.appendChild(span);
+      target.appendChild(span);
     }
   }
 
-  // ---- 6. renderActionLog(action, result) ----
-  function renderActionLog(action, result) {
+  // ---- 6. renderActionLog(action, result, portraitKey) ----
+  function renderActionLog(action, result, portraitKey) {
     const container = document.getElementById("action-log");
     if (!container) return;
 
@@ -259,6 +269,15 @@
       entry.appendChild(actionSpan);
     }
 
+    // NPC portrait if talking to an NPC
+    if (portraitKey && NPC_PORTRAITS[portraitKey]) {
+      const img = document.createElement("img");
+      img.className = "log-portrait";
+      img.src = NPC_PORTRAITS[portraitKey];
+      img.alt = portraitKey;
+      entry.appendChild(img);
+    }
+
     // Result line with color coding
     if (result) {
       const resultSpan = document.createElement("div");
@@ -278,7 +297,7 @@
 
     container.appendChild(entry);
 
-    // Cap at 20 entries
+    // Cap at 20 entries (keep log-header)
     var entries = container.querySelectorAll(".log-entry");
     while (entries.length > 20) {
       container.removeChild(entries[0]);
@@ -293,7 +312,12 @@
   function renderScan(scanText) {
     const container = document.getElementById("scan-panel");
     if (!container) return;
-    container.textContent = scanText || "";
+    const pre = container.querySelector(".scan-text");
+    if (pre) {
+      pre.textContent = scanText || "";
+    } else {
+      container.textContent = scanText || "";
+    }
   }
 
   // ---- 8. renderGameOver(data) ----
@@ -319,7 +343,7 @@
     }
 
     const panel = document.createElement("div");
-    panel.className = "game-over-panel";
+    panel.className = "game-over-box";
 
     // Title
     const title = document.createElement("h2");
@@ -336,7 +360,7 @@
     // Stats
     if (data.stats) {
       const stats = document.createElement("div");
-      stats.className = "game-over-stats";
+      stats.className = "stats";
 
       var lines = [
         "Turns: " + data.stats.turns,
@@ -372,12 +396,54 @@
     overlay.appendChild(panel);
   }
 
+  // Helper: detect NPC portrait key from talk action and current cell
+  function detectPortraitKey(state, action) {
+    if (!action || !action.startsWith("talk")) return null;
+    if (!state || !state.grid || !state.position) return null;
+    var r = state.position[0], c = state.position[1];
+    var cell = state.grid[r] && state.grid[r][c];
+    if (!cell || !cell.npc_name) return null;
+    // Map NPC names to portrait keys
+    var name = cell.npc_name.toLowerCase();
+    if (name.indexOf("vapnik") !== -1) return "dr_vapnik";
+    if (name.indexOf("dropout") !== -1) return "dropout";
+    if (name.indexOf("cryo") !== -1) return "cryo_sentinel";
+    return null;
+  }
+
+  // Remove LLM thinking spinner from action log
+  function removeSpinner() {
+    var container = document.getElementById("action-log");
+    if (!container) return;
+    var spinner = container.querySelector(".log-spinner");
+    if (spinner) spinner.parentNode.removeChild(spinner);
+  }
+
+  // Add LLM thinking spinner to action log
+  function showSpinner() {
+    removeSpinner();
+    var container = document.getElementById("action-log");
+    if (!container) return;
+    var el = document.createElement("div");
+    el.className = "log-entry log-spinner";
+    var span = document.createElement("span");
+    span.className = "spinner";
+    el.appendChild(span);
+    var text = document.createElement("span");
+    text.textContent = " LLM thinking...";
+    text.style.color = "var(--amber)";
+    el.appendChild(text);
+    container.appendChild(el);
+    container.scrollTop = container.scrollHeight;
+  }
+
   // ---- 9. updateUI(message) ----
   function updateUI(message) {
     if (!message || !message.type) return;
 
     switch (message.type) {
       case "turn_update":
+        removeSpinner();
         if (message.state) {
           renderGrid(message.state);
           renderHealth(message.state);
@@ -385,15 +451,30 @@
           renderTurnBar(message.state);
           renderInventory(message.state);
         }
-        renderActionLog(message.action, message.result);
+        var portrait = detectPortraitKey(message.state, message.action);
+        renderActionLog(message.action, message.result, portrait);
         renderScan(message.scan);
+        // Show spinner if auto mode is running (next turn coming)
+        if (window._autoRunning && message.state && message.state.is_alive && !message.state.has_won) {
+          showSpinner();
+        }
         break;
 
       case "game_over":
+        removeSpinner();
         renderGameOver(message);
         break;
 
+      case "auto_started":
+        showSpinner();
+        break;
+
+      case "auto_stopped":
+        removeSpinner();
+        break;
+
       case "error":
+        removeSpinner();
         renderActionLog("", message.message || "Unknown error");
         // Force damage styling on the last entry
         var log = document.getElementById("action-log");
@@ -455,12 +536,16 @@ const GameControls = (function () {
 
       if (msg.type === "auto_started") {
         autoRunning = true;
+        window._autoRunning = true;
         updateControlState();
       } else if (msg.type === "auto_stopped") {
         autoRunning = false;
+        window._autoRunning = false;
         updateControlState();
       } else if (msg.type === "game_over") {
         gameOver = true;
+        autoRunning = false;
+        window._autoRunning = false;
         updateControlState();
       }
 
@@ -721,6 +806,37 @@ const GameControls = (function () {
   }
 
   // -------------------------------------------------------------------
+  // Mission briefing panel
+  // -------------------------------------------------------------------
+
+  function showMissionBriefing() {
+    var log = document.getElementById("action-log");
+    if (!log) return;
+    var panel = document.createElement("div");
+    panel.className = "log-entry mission-briefing";
+    var text = document.createElement("div");
+    text.className = "result--success";
+    text.textContent = "\u{1F4CB} Collect 3 dossiers. Talk to informants. Destroy the robot. 30 turns.";
+    panel.appendChild(text);
+    var dismiss = document.createElement("button");
+    dismiss.className = "btn";
+    dismiss.textContent = "\u2715 Dismiss";
+    dismiss.style.marginTop = "4px";
+    dismiss.style.fontSize = "10px";
+    dismiss.addEventListener("click", function () {
+      panel.parentNode.removeChild(panel);
+    });
+    panel.appendChild(dismiss);
+    // Insert at top (after log-header)
+    var header = log.querySelector(".log-header");
+    if (header && header.nextSibling) {
+      log.insertBefore(panel, header.nextSibling);
+    } else {
+      log.appendChild(panel);
+    }
+  }
+
+  // -------------------------------------------------------------------
   // Initialization
   // -------------------------------------------------------------------
 
@@ -744,6 +860,9 @@ const GameControls = (function () {
           scan: "",
           state: resp.state,
         });
+
+        // Show dismissible mission briefing panel
+        showMissionBriefing();
       })
       .catch(function (err) {
         GameRenderer.renderActionLog("", "Failed to create game: " + err.message);

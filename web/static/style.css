@@ -704,6 +704,88 @@ body {
   background: var(--green);
 }
 
+/* Bar labels */
+.bar-label {
+  font-family: var(--font-heading);
+  font-size: 9px;
+  color: var(--green);
+  opacity: 0.7;
+  display: block;
+  margin-bottom: 2px;
+}
+
+/* Input group */
+.input-group {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.input-group .input-field {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Action controls column */
+.action-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Auto mode buttons row */
+.auto-controls {
+  display: flex;
+  gap: 6px;
+}
+
+/* Log header */
+.log-header {
+  font-family: var(--font-heading);
+  font-size: 9px;
+  color: var(--green);
+  opacity: 0.7;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+/* Log action line */
+.log-action {
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 2px;
+}
+
+/* NPC portrait in action log */
+.log-portrait {
+  display: block;
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border: 1px solid var(--panel-border);
+  border-radius: 2px;
+  margin: 4px 0;
+}
+
+/* Mission briefing panel */
+.mission-briefing {
+  background: rgba(0, 255, 65, 0.05);
+  border: 1px solid var(--green);
+  padding: 8px;
+  margin-bottom: 4px;
+}
+
+/* Scan text */
+.scan-text {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 11px;
+  white-space: pre-wrap;
+  color: var(--green);
+}
+
 /* Footer */
 .footer {
   text-align: center;
