@@ -38,20 +38,30 @@ logging.basicConfig(level=logging.INFO)
 # Gemini client setup
 # ---------------------------------------------------------------------------
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 gemini_client = None
 
-if GEMINI_API_KEY:
+
+def _init_gemini(api_key: str) -> bool:
+    """Initialise (or re-initialise) the Gemini client. Returns True on success."""
+    global gemini_client
     try:
         from google import genai
-        gemini_client = genai.Client(api_key=GEMINI_API_KEY)
-        logger.info("Gemini client initialized. LLM oracle and auto mode available.")
+        gemini_client = genai.Client(api_key=api_key)
+        logger.info("Gemini client initialized.")
+        return True
     except Exception as e:
         logger.warning(f"Failed to initialize Gemini client: {e}")
+        gemini_client = None
+        return False
+
+
+# Try env var on startup
+_env_key = os.environ.get("GEMINI_API_KEY", "")
+if _env_key:
+    _init_gemini(_env_key)
 else:
     logger.warning(
-        "GEMINI_API_KEY not set. Using stub oracle. "
-        "Auto mode LLM calls will be rejected."
+        "GEMINI_API_KEY not set. Provide it via the web UI or set the env var."
     )
 
 # ---------------------------------------------------------------------------
@@ -158,6 +168,28 @@ async def get_game(session_id: str):
     session.last_active = time.time()
     state = game_state_to_dict(session.operative, session.world, session.turn, session.max_turns)
     return {"session_id": session_id, "state": state}
+
+
+@app.get("/api/key/status")
+async def key_status():
+    """Check whether a Gemini API key is configured."""
+    return {"configured": gemini_client is not None}
+
+
+@app.post("/api/key")
+async def set_api_key(payload: dict):
+    """Set the Gemini API key at runtime."""
+    api_key = payload.get("api_key", "").strip()
+    if not api_key:
+        return {"ok": False, "message": "API key is empty."}
+    if _init_gemini(api_key):
+        # Update oracle on existing sessions to use LLM
+        for session in sessions.values():
+            session.tools.set_oracle(
+                lambda npc, q, o: llm_oracle(npc, q, o, gemini_client)
+            )
+        return {"ok": True, "message": "API key saved. LLM oracle and auto mode are now available."}
+    return {"ok": False, "message": "Failed to initialize Gemini client with that key."}
 
 
 # ---------------------------------------------------------------------------

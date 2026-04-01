@@ -551,6 +551,43 @@ body {
   border-color: var(--green);
 }
 
+/* API key row */
+.api-key-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.api-key-row label {
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.api-key-row .input-group {
+  flex: 1;
+  min-width: 180px;
+}
+
+.api-key-row .input-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.api-key-status {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.api-key--ok {
+  color: var(--green);
+}
+
+.api-key--err {
+  color: var(--red, #ff4444);
+}
+
 /* 10. Game Over
    ------------------------------------------------------------ */
 .game-over-overlay {
