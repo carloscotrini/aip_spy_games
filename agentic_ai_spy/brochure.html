@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>THE HIDDEN LAYER — Spy Thriller</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --green: #00ff41;
+      --green-dim: #00cc33;
+      --green-dark: #003d0f;
+      --amber: #ff8c00;
+      --amber-dim: #cc7000;
+      --red: #ff2222;
+      --red-dim: #cc0000;
+      --bg: #020a03;
+      --bg2: #050f06;
+      --white: #e8ffe8;
+      --grey: #447744;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--green);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 13px;
+      line-height: 1.7;
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Scanline overlay */
+    body::after {
+      content: '';
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0px,
+        transparent 3px,
+        rgba(0, 0, 0, 0.18) 3px,
+        rgba(0, 0, 0, 0.18) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* CRT vignette */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: radial-gradient(ellipse at center,
+        transparent 60%,
+        rgba(0,0,0,0.7) 100%
+      );
+      pointer-events: none;
+      z-index: 9998;
+    }
+
+    /* ─── ANIMATIONS ─── */
+    @keyframes flicker {
+      0%   { opacity: 1; }
+      92%  { opacity: 1; }
+      93%  { opacity: 0.6; }
+      94%  { opacity: 1; }
+      96%  { opacity: 0.8; }
+      97%  { opacity: 1; }
+      100% { opacity: 1; }
+    }
+
+    @keyframes blink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+
+    @keyframes glowPulse {
+      0%, 100% { text-shadow: 0 0 6px var(--green), 0 0 12px var(--green); }
+      50%       { text-shadow: 0 0 10px var(--green), 0 0 24px var(--green), 0 0 40px var(--green-dim); }
+    }
+
+    @keyframes stampAppear {
+      0%   { transform: rotate(-3deg) scale(1.3); opacity: 0; }
+      60%  { transform: rotate(-3deg) scale(0.97); opacity: 1; }
+      100% { transform: rotate(-3deg) scale(1); opacity: 1; }
+    }
+
+    @keyframes scanSlide {
+      0%   { background-position: 0 0; }
+      100% { background-position: 0 100px; }
+    }
+
+    /* ─── MAIN WRAPPER ─── */
+    .page {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 32px 24px 24px;
+      animation: flicker 8s infinite;
+    }
+
+    /* ─── CLASSIFIED BANNER ─── */
+    .classified-banner {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 28px;
+    }
+
+    .stamp {
+      display: inline-block;
+      border: 4px solid var(--red);
+      color: var(--red);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 9px;
+      letter-spacing: 4px;
+      padding: 8px 22px;
+      transform: rotate(-3deg);
+      text-shadow: 0 0 8px var(--red);
+      box-shadow: 0 0 10px var(--red-dim), inset 0 0 10px rgba(255,34,34,0.08);
+      animation: stampAppear 0.4s ease-out forwards;
+      background: rgba(255,34,34,0.07);
+    }
+
+    /* ─── TITLE BLOCK ─── */
+    .title-block {
+      text-align: center;
+      margin-bottom: 28px;
+      border: 2px solid var(--green-dim);
+      padding: 20px 16px 16px;
+      position: relative;
+      background: linear-gradient(180deg, rgba(0,255,65,0.04) 0%, transparent 100%);
+      box-shadow: 0 0 24px rgba(0,255,65,0.12), inset 0 0 30px rgba(0,255,65,0.04);
+    }
+
+    .title-block::before {
+      content: '╔══════════════════════════════════════════════════════════╗';
+      display: block;
+      font-size: 11px;
+      color: var(--green-dim);
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    .title-block::after {
+      content: '╚══════════════════════════════════════════════════════════╝';
+      display: block;
+      font-size: 11px;
+      color: var(--green-dim);
+      margin-top: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    .game-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(22px, 5vw, 38px);
+      color: var(--green);
+      text-shadow: 0 0 8px var(--green), 0 0 20px var(--green), 0 0 40px var(--green-dim);
+      animation: glowPulse 3s ease-in-out infinite, flicker 8s infinite;
+      letter-spacing: 2px;
+      margin-bottom: 12px;
+      line-height: 1.4;
+    }
+
+    .game-subtitle {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 13px;
+      color: var(--amber);
+      text-shadow: 0 0 8px var(--amber);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    /* ─── BOX UTILITY ─── */
+    .retro-box {
+      border: 1px solid var(--green-dim);
+      padding: 16px;
+      margin-bottom: 20px;
+      background: rgba(0,255,65,0.025);
+      position: relative;
+    }
+
+    .retro-box .box-tl::before { content: '╔'; }
+    .retro-box .box-tr::before { content: '╗'; }
+    .retro-box .box-bl::before { content: '╚'; }
+    .retro-box .box-br::before { content: '╝'; }
+
+    .box-corner {
+      position: absolute;
+      font-size: 14px;
+      color: var(--green);
+      line-height: 1;
+    }
+    .box-corner.tl { top: -1px; left: -1px; }
+    .box-corner.tr { top: -1px; right: -1px; }
+    .box-corner.bl { bottom: -1px; left: -1px; }
+    .box-corner.br { bottom: -1px; right: -1px; }
+
+    .section-label {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 9px;
+      color: var(--amber);
+      text-shadow: 0 0 6px var(--amber);
+      letter-spacing: 2px;
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    /* ─── INTRO SECTION ─── */
+    .intro-section {
+      margin-bottom: 20px;
+    }
+
+    .setting-line {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 9px;
+      color: var(--amber);
+      text-shadow: 0 0 6px var(--amber);
+      letter-spacing: 1px;
+      margin-bottom: 14px;
+      display: block;
+    }
+
+    .intro-text {
+      color: var(--white);
+      font-size: 13px;
+      line-height: 1.9;
+      text-shadow: 0 0 4px rgba(0,255,65,0.3);
+      margin-bottom: 14px;
+    }
+
+    .intro-text em {
+      color: var(--green);
+      font-style: normal;
+      font-weight: bold;
+      text-shadow: 0 0 6px var(--green);
+    }
+
+    .intro-text .danger {
+      color: var(--red);
+      text-shadow: 0 0 6px var(--red);
+    }
+
+    /* ─── TWO-COLUMN GRID ─── */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    @media (max-width: 620px) {
+      .two-col { grid-template-columns: 1fr; }
+    }
+
+    /* ─── CONTACTS ─── */
+    .contacts-section {
+      margin-bottom: 20px;
+    }
+
+    .contacts-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 10px;
+      color: var(--green);
+      text-shadow: 0 0 8px var(--green);
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--green-dim);
+    }
+
+    .contact-card {
+      border: 1px solid var(--grey);
+      padding: 14px;
+      margin-bottom: 14px;
+      background: rgba(0,60,15,0.3);
+      position: relative;
+    }
+
+    .contact-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 3px;
+      height: 100%;
+      background: var(--amber);
+      box-shadow: 0 0 6px var(--amber);
+    }
+
+    .contact-name {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      color: var(--amber);
+      text-shadow: 0 0 6px var(--amber);
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+      padding-left: 10px;
+    }
+
+    .contact-role {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--green-dim);
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+      padding-left: 10px;
+    }
+
+    .contact-bio {
+      color: var(--white);
+      font-size: 12px;
+      line-height: 1.8;
+      padding-left: 10px;
+      text-shadow: 0 0 3px rgba(0,255,65,0.2);
+    }
+
+    .contact-bio em {
+      color: var(--green);
+      font-style: normal;
+    }
+
+    /* ─── BOSS SECTION ─── */
+    .bosses-section {
+      margin-bottom: 20px;
+    }
+
+    .bosses-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 10px;
+      color: var(--red);
+      text-shadow: 0 0 8px var(--red);
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--red-dim);
+    }
+
+    .bosses-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 620px) {
+      .bosses-grid { grid-template-columns: 1fr; }
+    }
+
+    .boss-box {
+      border: 2px solid var(--red-dim);
+      padding: 14px;
+      background: rgba(40,0,0,0.5);
+      box-shadow: 0 0 12px rgba(255,34,34,0.15), inset 0 0 16px rgba(255,34,34,0.05);
+      position: relative;
+    }
+
+    .boss-box-header {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      color: var(--red-dim);
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      opacity: 0.8;
+    }
+
+    .boss-icon {
+      font-size: 28px;
+      display: block;
+      margin: 8px 0;
+      text-align: center;
+      filter: drop-shadow(0 0 8px rgba(255,34,34,0.7));
+    }
+
+    .boss-name {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      color: var(--red);
+      text-shadow: 0 0 8px var(--red);
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+
+    .boss-desc {
+      color: var(--white);
+      font-size: 11px;
+      line-height: 1.8;
+      margin-bottom: 10px;
+    }
+
+    .boss-desc .last-words {
+      color: var(--red-dim);
+      font-style: italic;
+      font-size: 10px;
+    }
+
+    .weakness-tag {
+      display: inline-block;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 7px;
+      color: var(--green);
+      border: 1px solid var(--green-dim);
+      padding: 4px 8px;
+      letter-spacing: 1px;
+      background: rgba(0,255,65,0.08);
+    }
+
+    .boss-corner {
+      position: absolute;
+      font-size: 13px;
+      color: var(--red-dim);
+      line-height: 1;
+    }
+    .boss-corner.tl { top: 2px; left: 4px; }
+    .boss-corner.tr { top: 2px; right: 4px; }
+    .boss-corner.bl { bottom: 2px; left: 4px; }
+    .boss-corner.br { bottom: 2px; right: 4px; }
+
+    /* ─── MISSION SPECS ─── */
+    .mission-section {
+      margin-bottom: 20px;
+    }
+
+    .mission-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 10px;
+      color: var(--green);
+      text-shadow: 0 0 8px var(--green);
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--green-dim);
+    }
+
+    .specs-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    @media (max-width: 480px) {
+      .specs-grid { grid-template-columns: 1fr; }
+    }
+
+    .spec-row {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding: 10px;
+      border: 1px solid rgba(0,255,65,0.2);
+      background: rgba(0,255,65,0.02);
+    }
+
+    .spec-key {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 7px;
+      color: var(--amber);
+      letter-spacing: 1px;
+    }
+
+    .spec-val {
+      color: var(--white);
+      font-size: 12px;
+    }
+
+    .health-bar {
+      font-size: 16px;
+      letter-spacing: 2px;
+    }
+
+    .health-filled { color: var(--green); text-shadow: 0 0 6px var(--green); }
+    .health-empty  { color: #1a3d1a; }
+
+    /* ─── TOOLS SECTION ─── */
+    .tools-section {
+      border: 1px solid var(--amber-dim);
+      padding: 14px 16px;
+      margin-bottom: 20px;
+      background: rgba(255,140,0,0.04);
+      position: relative;
+    }
+
+    .tools-label {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      color: var(--amber);
+      text-shadow: 0 0 6px var(--amber);
+      letter-spacing: 2px;
+      margin-bottom: 10px;
+    }
+
+    .tools-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .tool-chip {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      color: var(--green);
+      border: 1px solid var(--green-dim);
+      padding: 4px 10px;
+      background: rgba(0,255,65,0.06);
+      text-shadow: 0 0 4px var(--green);
+      letter-spacing: 1px;
+    }
+
+    .tools-tagline {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 7px;
+      color: var(--amber-dim);
+      letter-spacing: 1px;
+      margin-top: 4px;
+    }
+
+    /* ─── WARNING BOX ─── */
+    .warning-box {
+      border: 3px solid var(--amber);
+      padding: 16px 18px;
+      margin-bottom: 20px;
+      background: rgba(255,140,0,0.06);
+      box-shadow: 0 0 16px rgba(255,140,0,0.2), inset 0 0 20px rgba(255,140,0,0.04);
+      position: relative;
+    }
+
+    .warning-header {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 9px;
+      color: var(--amber);
+      text-shadow: 0 0 8px var(--amber);
+      letter-spacing: 2px;
+      margin-bottom: 10px;
+    }
+
+    .warning-text {
+      color: var(--white);
+      font-size: 13px;
+      line-height: 1.8;
+    }
+
+    .warning-text em {
+      color: var(--amber);
+      font-style: normal;
+      text-shadow: 0 0 6px var(--amber);
+    }
+
+    .warning-corner {
+      position: absolute;
+      font-size: 14px;
+      color: var(--amber);
+      line-height: 1;
+    }
+    .warning-corner.tl { top: 3px; left: 5px; }
+    .warning-corner.tr { top: 3px; right: 5px; }
+    .warning-corner.bl { bottom: 3px; left: 5px; }
+    .warning-corner.br { bottom: 3px; right: 5px; }
+
+    /* ─── DIVIDER ─── */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--green-dark);
+      margin: 20px 0;
+      position: relative;
+    }
+
+    .divider::before {
+      content: '═══════════════════════════════════════════════════════════════════════════════';
+      display: block;
+      color: #003d0f;
+      font-size: 11px;
+      overflow: hidden;
+      height: 14px;
+      line-height: 14px;
+    }
+
+    /* ─── BLINKING CURSOR ─── */
+    .cursor {
+      display: inline-block;
+      width: 10px;
+      height: 14px;
+      background: var(--green);
+      vertical-align: middle;
+      animation: blink 1s step-start infinite;
+      box-shadow: 0 0 6px var(--green);
+      margin-left: 3px;
+    }
+
+    /* ─── FOOTER ─── */
+    .footer {
+      margin-top: 24px;
+      border-top: 3px solid var(--green-dim);
+      padding-top: 16px;
+      background: linear-gradient(0deg, rgba(0,255,65,0.04) 0%, transparent 100%);
+    }
+
+    .footer-inner {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .footer-block {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      color: var(--green-dim);
+      text-shadow: 0 0 4px var(--green-dark);
+      letter-spacing: 1px;
+      line-height: 1.8;
+    }
+
+    .footer-block .highlight {
+      color: var(--amber);
+      text-shadow: 0 0 6px var(--amber-dim);
+    }
+
+    .footer-block .danger-text {
+      color: var(--red);
+      text-shadow: 0 0 6px var(--red-dim);
+    }
+
+    .footer-copyright {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      color: #225522;
+      letter-spacing: 2px;
+      text-align: center;
+      margin-top: 12px;
+      padding-top: 8px;
+      border-top: 1px solid #0d200d;
+    }
+
+    /* ─── OVERFIT PARA INLINE ─── */
+    .overfit-inline {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-left: 3px solid var(--red-dim);
+      background: rgba(255,34,34,0.04);
+    }
+
+    .overfit-inline p {
+      color: var(--white);
+      font-size: 12px;
+      line-height: 1.9;
+    }
+
+    .overfit-inline em {
+      color: var(--red);
+      font-style: normal;
+      text-shadow: 0 0 6px var(--red);
+    }
+
+    .overfit-inline strong {
+      color: var(--amber);
+      font-weight: normal;
+      text-shadow: 0 0 4px var(--amber-dim);
+    }
+
+    /* ─── ASCII DECORATIONS ─── */
+    .ascii-line {
+      font-size: 11px;
+      color: #1a4d1a;
+      letter-spacing: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      line-height: 1.2;
+    }
+
+    .grid-tag {
+      display: inline-block;
+      font-size: 11px;
+      color: var(--green-dim);
+      border: 1px solid #1a4d1a;
+      padding: 3px 8px;
+      margin-right: 6px;
+      margin-bottom: 4px;
+    }
+
+    /* ─── SECTION HEADER BARS ─── */
+    .section-header-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .section-header-bar .bar-text {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 9px;
+      white-space: nowrap;
+    }
+
+    .section-header-bar .bar-line {
+      flex: 1;
+      height: 1px;
+      background: currentColor;
+      opacity: 0.3;
+    }
+
+    /* ─── STAT BADGE ─── */
+    .stat-badge {
+      display: inline-block;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 7px;
+      background: rgba(0,255,65,0.1);
+      color: var(--green);
+      border: 1px solid var(--green-dim);
+      padding: 3px 8px;
+      margin-right: 4px;
+      margin-bottom: 4px;
+      text-shadow: 0 0 4px var(--green);
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- CLASSIFIED BANNER -->
+  <div class="classified-banner">
+    <div class="stamp">CLASSIFIED &nbsp;·&nbsp; TOP SECRET &nbsp;·&nbsp; EYES ONLY</div>
+  </div>
+
+  <!-- TITLE BLOCK -->
+  <div class="title-block">
+    <div class="game-title">THE HIDDEN LAYER</div>
+    <div class="game-subtitle">A SPY THRILLER FOR THE THINKING MACHINE</div>
+  </div>
+
+  <!-- INTRO SECTION -->
+  <div class="retro-box intro-section">
+    <span class="box-corner tl">╔</span>
+    <span class="box-corner tr">╗</span>
+    <span class="box-corner bl">╚</span>
+    <span class="box-corner br">╝</span>
+
+    <span class="setting-line">▶ ISLA PERDIDA &nbsp;·&nbsp; 0300 HOURS &nbsp;·&nbsp; MISSION BRIEFING</span>
+
+    <p class="intro-text">
+      The island is crawling with OVERFIT patrols. <em>OVERFIT</em>'s robots never sleep.
+      Neither do you. You have <span class="danger">3 health points</span> and absolutely <span class="danger">no backup.</span>
+    </p>
+
+    <div class="overfit-inline">
+      <p>
+        <strong>OVERFIT Corporation</strong> started as an AI research company. Then they militarized the models.
+        Then they militarized the people. Agents who think too freely get <em>"regularized"</em> — dropped from
+        the network, permanently. Dr. Vapnik designed their core algorithms, saw what they were used for, and
+        defected. Now he's helping you burn it all down. OVERFIT optimized for power. They forgot to
+        <em>regularize for evil.</em>
+      </p>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- CONTACTS -->
+  <div class="contacts-section">
+    <div class="contacts-title">► YOUR CONTACTS IN THE FIELD<span class="cursor"></span></div>
+
+    <div class="contact-card">
+      <div class="contact-name">DR. VAPNIK</div>
+      <div class="contact-role">// THE SUPPORT VECTOR</div>
+      <div class="contact-bio">
+        Speaks entirely in statistical metaphors. Probably insane. Definitely essential.
+        He designed OVERFIT's core algorithms — and he's <em>maximizing the margin</em>
+        between you and death.
+      </div>
+    </div>
+
+    <div class="contact-card">
+      <div class="contact-name">INFORMANT BACKPROP</div>
+      <div class="contact-role">// THE GRADIENT DESCENT INTO MADNESS</div>
+      <div class="contact-bio">
+        Paranoid. Fast-talking. Knows too much and trusts too little. He'll
+        <em>propagate the intel forward</em> — but only if you bring him something valuable.
+        Every conversation with Backprop is a step in the right direction. Watch out:
+        his error rate is high, and he's losing it <em>one layer at a time.</em>
+      </div>
+    </div>
+
+    <div class="contact-card">
+      <div class="contact-name">AGENT DROPOUT</div>
+      <div class="contact-role">// RANDOMLY REMOVED FROM ACTIVE DUTY</div>
+      <div class="contact-bio">
+        Burned. Off-grid. Off-book. Possibly off his rocker. He <em>dropped out of the network</em>
+        years ago — now he's a <em>regularization nightmare</em> for OVERFIT's surveillance.
+        Trade him a Hard Drive and he'll keep your operation from <em>overfitting to failure.</em>
+        Some neurons are better left disconnected. He'd agree.
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- BOSS SECTION -->
+  <div class="bosses-section">
+    <div class="bosses-title">⚠ ENEMY COMBATANTS — THREAT ASSESSMENT</div>
+
+    <div class="bosses-grid">
+
+      <div class="boss-box">
+        <span class="boss-corner tl">╔</span>
+        <span class="boss-corner tr">╗</span>
+        <span class="boss-corner bl">╚</span>
+        <span class="boss-corner br">╝</span>
+        <div class="boss-box-header">[ BOSS_01.EXE ]</div>
+        <span class="boss-icon">❄</span>
+        <div class="boss-name">CRYO-SENTINEL</div>
+        <div class="boss-desc">
+          Guards the northern server room. It will freeze you solid.
+          Do not engage without proper countermeasures.
+        </div>
+        <div class="weakness-tag">WEAKNESS: 🔥 FIRE / FLAMETHROWER</div>
+      </div>
+
+      <div class="boss-box">
+        <span class="boss-corner tl">╔</span>
+        <span class="boss-corner tr">╗</span>
+        <span class="boss-corner bl">╚</span>
+        <span class="boss-corner br">╝</span>
+        <div class="boss-box-header">[ BOSS_02.EXE ]</div>
+        <span class="boss-icon">▓</span>
+        <div class="boss-name">EVIL AI ROBOT</div>
+        <div class="boss-desc">
+          Controls cameras and every lock on the island.
+          <span class="last-words">"LOSS FUNCTION: UNDEFINED. LOSS FUNCTION: UNDEF—"</span>
+        </div>
+        <div class="weakness-tag">WEAKNESS: 🦠 COMPUTER VIRUS</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- MISSION SPECS -->
+  <div class="mission-section">
+    <div class="mission-title">▶ MISSION SPECS</div>
+
+    <div class="specs-grid">
+      <div class="spec-row">
+        <span class="spec-key">OBJECTIVE</span>
+        <span class="spec-val">Collect <strong style="color:var(--green);text-shadow:0 0 6px var(--green)">10</strong> classified dossiers</span>
+      </div>
+      <div class="spec-row">
+        <span class="spec-key">EXTRACTION</span>
+        <span class="spec-val">Automatic once <strong style="color:var(--amber);text-shadow:0 0 4px var(--amber)">10 dossiers</strong> secured</span>
+      </div>
+      <div class="spec-row">
+        <span class="spec-key">HEALTH STATUS</span>
+        <span class="spec-val">
+          <span class="health-bar">
+            <span class="health-filled">██████</span><span class="health-empty">░░░░</span>
+          </span>
+          &nbsp;<span style="font-size:11px;color:var(--green)">3/3</span>
+        </span>
+      </div>
+      <div class="spec-row">
+        <span class="spec-key">GRID SIZE</span>
+        <span class="spec-val">8 × 8 &nbsp;<span style="color:var(--grey);font-size:11px">// jungle · concrete · traps · robots</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOOLS SECTION -->
+  <div class="tools-section">
+    <span class="box-corner tl" style="position:absolute;top:3px;left:5px;font-size:13px;color:var(--amber-dim)">╔</span>
+    <span class="box-corner tr" style="position:absolute;top:3px;right:5px;font-size:13px;color:var(--amber-dim)">╗</span>
+    <span class="box-corner bl" style="position:absolute;bottom:3px;left:5px;font-size:13px;color:var(--amber-dim)">╚</span>
+    <span class="box-corner br" style="position:absolute;bottom:3px;right:5px;font-size:13px;color:var(--amber-dim)">╝</span>
+
+    <div class="tools-label">▶ AVAILABLE TOOLS</div>
+    <div class="tools-list">
+      <span class="tool-chip">move</span>
+      <span class="tool-chip">talk</span>
+      <span class="tool-chip">collect</span>
+      <span class="tool-chip">fabricate</span>
+      <span class="tool-chip">hide</span>
+    </div>
+    <div class="tools-tagline">FIVE ACTIONS. INFINITE WAYS TO GET IT WRONG.</div>
+  </div>
+
+  <!-- WARNING BOX -->
+  <div class="warning-box">
+    <span class="warning-corner tl">╔</span>
+    <span class="warning-corner tr">╗</span>
+    <span class="warning-corner bl">╚</span>
+    <span class="warning-corner br">╝</span>
+    <div class="warning-header">⚠ SYSTEM REQUIREMENTS / WARNING</div>
+    <div class="warning-text">
+      This mission requires <em>strategic thinking</em>, careful <em>resource management</em>,
+      and a language model that <em>actually knows what it's doing.</em><br><br>
+      You provide the LLM. We provide the island.
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-inner">
+      <div class="footer-block">
+        <span class="highlight">1 PLAYER</span><br>
+        DIFFICULTY: <span class="danger-text">GRADIENT HARD</span>
+      </div>
+      <div class="footer-block" style="text-align:center;">
+        REQUIRES:<br>
+        <span class="highlight">Gemini API</span> + <span style="color:var(--green-dim)">common sense</span>
+      </div>
+      <div class="footer-block" style="text-align:right;">
+        <span style="color:var(--grey)">© BMAI FS26</span><br>
+        <span style="color:#1a3d1a">ALL WEIGHTS RESERVED</span>
+      </div>
+    </div>
+    <div class="footer-copyright">
+      &gt;&gt; THE HIDDEN LAYER &nbsp;·&nbsp; ISLA PERDIDA &nbsp;·&nbsp; CLASSIFIED &nbsp;·&nbsp; DO NOT DISTRIBUTE &nbsp;·&nbsp; ██████████ &lt;&lt;
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
