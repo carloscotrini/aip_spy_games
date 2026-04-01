@@ -13,42 +13,41 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div class="app-container">
 
   <!-- Title Bar -->
-  <header id="title-bar">
+  <header id="title-bar" class="title-bar">
     <h1>&#x1F575;&#xFE0F; THE HIDDEN LAYER &mdash; MICRO MISSION</h1>
-    <nav>
-      <button id="btn-manual" class="btn">Manual</button>
-      <button id="btn-auto" class="btn">Auto</button>
-      <button id="btn-reset" class="btn btn--warning">Reset</button>
+    <nav class="mode-buttons">
+      <button id="btn-manual" class="btn" tabindex="10">Manual</button>
+      <button id="btn-auto" class="btn" tabindex="11">Auto</button>
+      <button id="btn-reset" class="btn btn--warning" tabindex="12">Reset</button>
     </nav>
   </header>
 
   <!-- Game Area: Map + Stats -->
-  <section id="game-area">
+  <section id="game-area" class="game-area">
     <div id="game-map" class="game-grid"></div>
 
-    <div id="stats-panel">
+    <div id="stats-panel" class="stats-panel">
       <div id="turn-bar" class="turn-bar">
-        <span class="bar-label">Turn</span>
-        <div class="bar-track"><div class="bar-fill"></div></div>
-        <span class="bar-text"></span>
+        <div class="turn-bar__fill"></div>
+        <span class="turn-bar__text"></span>
       </div>
 
       <div id="health-bar" class="health-bar"></div>
 
       <div id="dossier-bar" class="dossier-bar">
-        <span class="bar-label">Dossiers</span>
-        <div class="bar-track"><div class="bar-fill"></div></div>
-        <span class="bar-text"></span>
+        <div class="dossier-bar__fill"></div>
+        <span class="dossier-bar__text"></span>
       </div>
 
-      <div id="inventory">
+      <div id="inventory" class="inventory">
         <span class="bar-label">Inventory</span>
         <div class="inventory-items"></div>
       </div>
 
-      <div id="scan-panel">
+      <div id="scan-panel" class="scan-panel">
         <span class="bar-label">&#x1F4E1; Scan</span>
         <pre class="scan-text"></pre>
       </div>
@@ -56,33 +55,33 @@
   </section>
 
   <!-- Controls Area -->
-  <section id="controls-area">
+  <section id="controls-area" class="controls-area">
     <div class="controls-row">
       <!-- D-Pad -->
       <div class="dpad">
         <div></div>
-        <button id="dpad-north" class="btn btn--primary">&uarr;</button>
+        <button id="dpad-north" class="btn btn--primary" tabindex="1">&uarr;</button>
         <div></div>
-        <button id="dpad-west" class="btn btn--primary">&larr;</button>
+        <button id="dpad-west" class="btn btn--primary" tabindex="2">&larr;</button>
         <div class="dpad-center"></div>
-        <button id="dpad-east" class="btn btn--primary">&rarr;</button>
+        <button id="dpad-east" class="btn btn--primary" tabindex="3">&rarr;</button>
         <div></div>
-        <button id="dpad-south" class="btn btn--primary">&darr;</button>
+        <button id="dpad-south" class="btn btn--primary" tabindex="4">&darr;</button>
         <div></div>
       </div>
 
       <!-- Action buttons -->
       <div class="action-controls">
-        <button id="btn-collect" class="btn btn--success">&#x270B; Collect</button>
+        <button id="btn-collect" class="btn btn--success" tabindex="5">&#x270B; Collect</button>
 
         <div class="input-group">
-          <input type="text" id="talk-input" class="input-field" placeholder="Message...">
-          <button id="talk-send" class="btn btn--primary">&#x1F4AC; Send</button>
+          <input type="text" id="talk-input" class="input-field" placeholder="Message..." tabindex="6">
+          <button id="talk-send" class="btn btn--primary" tabindex="7">&#x1F4AC; Send</button>
         </div>
 
         <div class="input-group">
-          <input type="text" id="fabricate-input" class="input-field" placeholder="Item name...">
-          <button id="fabricate-send" class="btn btn--primary">&#x1F527; Build</button>
+          <input type="text" id="fabricate-input" class="input-field" placeholder="Item name..." tabindex="8">
+          <button id="fabricate-send" class="btn btn--primary" tabindex="9">&#x1F527; Build</button>
         </div>
 
         <div class="auto-controls">
@@ -115,9 +114,11 @@
   </section>
 
   <!-- Game Over Overlay (hidden) -->
-  <div id="game-over-overlay" class="game-over-overlay" style="display:none;"></div>
+  <div id="game-over-overlay" class="game-over-overlay"></div>
 
-  <footer>BMAI FS26 &mdash; ETH Z&uuml;rich</footer>
+  <footer class="footer">BMAI FS26 &mdash; ETH Z&uuml;rich</footer>
+
+</div><!-- .app-container -->
 
   <script src="game.js" defer></script>
 </body>
