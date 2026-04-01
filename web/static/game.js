@@ -1,1 +1,427 @@
-// TODO
+// ============================================================
+// THE HIDDEN LAYER — Game Renderer (ISSUE-5)
+// ============================================================
+
+(function () {
+  "use strict";
+
+  // Track previously visible cell positions for reveal animations
+  let previouslyVisible = new Set();
+
+  // Item icon mapping
+  const ITEM_ICONS = {
+    "USB Drive": "\u{1F4BE}",
+    "Flamethrower": "\u{1F525}",
+    "Scrap Metal": "\u2699\uFE0F",
+    "Microfilm": "\u{1F4F7}",
+    "Fuel Canister": "\u26FD",
+    "Hard Drive": "\u{1F4BF}",
+    "Medical Supplies": "\u{1FA79}",
+    "Virus Code": "\u{1F4BB}",
+    "Computer Virus": "\u{1F41B}",
+    "Radio Codebook": "\u{1F4D7}",
+  };
+
+  // Action icon mapping
+  const ACTION_ICONS = {
+    move: "\u{1F9ED}",
+    talk: "\u{1F4AC}",
+    collect: "\u270B",
+    fabricate: "\u{1F527}",
+  };
+
+  // Success/damage keyword patterns
+  const SUCCESS_PATTERN =
+    /dossier|collected|delivered|built|destroy|reward|mission complete/i;
+  const DAMAGE_PATTERN =
+    /damage|hurt|fail|cannot|retreat|tripwire|neutralized/i;
+
+  // ---- 1. renderGrid(state) ----
+  function renderGrid(state) {
+    const container = document.getElementById("game-map");
+    if (!container) return;
+
+    const rows = state.rows;
+    const cols = state.cols;
+    const grid = state.grid;
+    const position = state.position;
+
+    // Build set of currently visible positions
+    const currentlyVisible = new Set();
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (grid[r][c].visible) {
+          currentlyVisible.add(r + "," + c);
+        }
+      }
+    }
+
+    // Set CSS grid columns
+    container.style.setProperty("--grid-cols", cols);
+
+    // Clear existing grid if dimensions changed
+    const existingCells = container.querySelectorAll(".cell");
+    if (existingCells.length !== rows * cols) {
+      while (container.firstChild) {
+        container.removeChild(container.firstChild);
+      }
+    }
+
+    // Ensure we have enough cells
+    let cells = container.querySelectorAll(".cell");
+    if (cells.length === 0) {
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const div = document.createElement("div");
+          container.appendChild(div);
+        }
+      }
+      cells = container.querySelectorAll("div");
+    }
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const idx = r * cols + c;
+        const cellEl = cells[idx];
+        const cellData = grid[r][c];
+        const key = r + "," + c;
+        const isAgent = position[0] === r && position[1] === c;
+
+        // Reset classes
+        cellEl.className = "cell";
+
+        if (!cellData.visible) {
+          cellEl.classList.add("cell--fog");
+          cellEl.textContent = "\u2591";
+        } else {
+          cellEl.classList.add("cell--" + cellData.type);
+
+          if (isAgent) {
+            cellEl.classList.add("cell--agent");
+            cellEl.textContent = "\u{1F574}\uFE0F";
+          } else {
+            cellEl.textContent = cellData.emoji;
+          }
+
+          // Check if newly revealed
+          if (!previouslyVisible.has(key)) {
+            cellEl.classList.add("cell--reveal");
+            setTimeout(function () {
+              cellEl.classList.remove("cell--reveal");
+            }, 300);
+          }
+        }
+      }
+    }
+
+    // Update tracked visible set
+    previouslyVisible = currentlyVisible;
+  }
+
+  // ---- 2. renderHealth(state) ----
+  function renderHealth(state) {
+    const container = document.getElementById("health-bar");
+    if (!container) return;
+
+    while (container.firstChild) {
+      container.removeChild(container.firstChild);
+    }
+
+    for (let i = 0; i < state.max_health; i++) {
+      const span = document.createElement("span");
+      span.textContent = i < state.health ? "\u2764\uFE0F" : "\u{1F5A4}";
+      container.appendChild(span);
+    }
+  }
+
+  // ---- 3. renderDossierBar(state) ----
+  function renderDossierBar(state) {
+    const container = document.getElementById("dossier-bar");
+    if (!container) return;
+
+    // Ensure inner bar and label exist
+    let inner = container.querySelector(".dossier-bar__inner");
+    let label = container.querySelector(".dossier-bar__label");
+
+    if (!inner) {
+      inner = document.createElement("div");
+      inner.className = "dossier-bar__inner";
+      container.appendChild(inner);
+    }
+    if (!label) {
+      label = document.createElement("span");
+      label.className = "dossier-bar__label";
+      container.appendChild(label);
+    }
+
+    const pct = state.win_dossiers > 0
+      ? (state.dossiers / state.win_dossiers) * 100
+      : 0;
+    inner.style.width = Math.min(pct, 100) + "%";
+
+    label.textContent = state.dossiers + "/" + state.win_dossiers;
+
+    if (state.dossiers >= state.win_dossiers) {
+      container.classList.add("dossier-bar--complete");
+    } else {
+      container.classList.remove("dossier-bar--complete");
+    }
+  }
+
+  // ---- 4. renderTurnBar(state) ----
+  function renderTurnBar(state) {
+    const container = document.getElementById("turn-bar");
+    if (!container) return;
+
+    let inner = container.querySelector(".turn-bar__inner");
+    let label = container.querySelector(".turn-bar__label");
+
+    if (!inner) {
+      inner = document.createElement("div");
+      inner.className = "turn-bar__inner";
+      container.appendChild(inner);
+    }
+    if (!label) {
+      label = document.createElement("span");
+      label.className = "turn-bar__label";
+      container.appendChild(label);
+    }
+
+    const pct = state.max_turns > 0
+      ? (state.turn / state.max_turns) * 100
+      : 0;
+    inner.style.width = Math.min(pct, 100) + "%";
+
+    label.textContent = "Turn " + state.turn + "/" + state.max_turns;
+
+    // Remove old color classes
+    container.classList.remove("turn-bar--ok", "turn-bar--warn", "turn-bar--danger");
+
+    if (pct >= 80) {
+      container.classList.add("turn-bar--danger");
+    } else if (pct >= 60) {
+      container.classList.add("turn-bar--warn");
+    } else {
+      container.classList.add("turn-bar--ok");
+    }
+  }
+
+  // ---- 5. renderInventory(state) ----
+  function renderInventory(state) {
+    const container = document.getElementById("inventory");
+    if (!container) return;
+
+    while (container.firstChild) {
+      container.removeChild(container.firstChild);
+    }
+
+    if (!state.inventory || state.inventory.length === 0) {
+      const empty = document.createElement("span");
+      empty.className = "item-slot";
+      empty.style.fontStyle = "italic";
+      empty.textContent = "Empty";
+      container.appendChild(empty);
+      return;
+    }
+
+    for (let i = 0; i < state.inventory.length; i++) {
+      const name = state.inventory[i];
+      const icon = ITEM_ICONS[name] || "\u{1F4E6}";
+      const span = document.createElement("span");
+      span.className = "item-slot";
+      span.textContent = icon + " " + name;
+      container.appendChild(span);
+    }
+  }
+
+  // ---- 6. renderActionLog(action, result) ----
+  function renderActionLog(action, result) {
+    const container = document.getElementById("action-log");
+    if (!container) return;
+
+    const entry = document.createElement("div");
+    entry.className = "log-entry";
+
+    // Determine action icon
+    var icon = "\u{1F4CB}";
+    if (action) {
+      var actionName = action.split("(")[0];
+      if (ACTION_ICONS[actionName]) {
+        icon = ACTION_ICONS[actionName];
+      }
+    }
+
+    // Action line
+    if (action) {
+      const actionSpan = document.createElement("div");
+      actionSpan.className = "log-action";
+      actionSpan.textContent = icon + " " + action;
+      entry.appendChild(actionSpan);
+    }
+
+    // Result line with color coding
+    if (result) {
+      const resultSpan = document.createElement("div");
+      resultSpan.className = "log-result";
+
+      if (SUCCESS_PATTERN.test(result)) {
+        resultSpan.classList.add("result--success");
+      } else if (DAMAGE_PATTERN.test(result)) {
+        resultSpan.classList.add("result--damage");
+      } else {
+        resultSpan.classList.add("result--neutral");
+      }
+
+      resultSpan.textContent = result;
+      entry.appendChild(resultSpan);
+    }
+
+    container.appendChild(entry);
+
+    // Cap at 20 entries
+    var entries = container.querySelectorAll(".log-entry");
+    while (entries.length > 20) {
+      container.removeChild(entries[0]);
+      entries = container.querySelectorAll(".log-entry");
+    }
+
+    // Auto-scroll to bottom
+    container.scrollTop = container.scrollHeight;
+  }
+
+  // ---- 7. renderScan(scanText) ----
+  function renderScan(scanText) {
+    const container = document.getElementById("scan-panel");
+    if (!container) return;
+    container.textContent = scanText || "";
+  }
+
+  // ---- 8. renderGameOver(data) ----
+  function renderGameOver(data) {
+    const overlay = document.getElementById("game-over-overlay");
+    if (!overlay) return;
+
+    // Clear previous content
+    while (overlay.firstChild) {
+      overlay.removeChild(overlay.firstChild);
+    }
+
+    overlay.style.display = "flex";
+    overlay.className = "game-over-overlay";
+
+    // Determine outcome class
+    if (data.won) {
+      overlay.classList.add("game-over--victory");
+    } else if (data.reason && /fallen/i.test(data.reason)) {
+      overlay.classList.add("game-over--defeat");
+    } else {
+      overlay.classList.add("game-over--timeout");
+    }
+
+    const panel = document.createElement("div");
+    panel.className = "game-over-panel";
+
+    // Title
+    const title = document.createElement("h2");
+    title.textContent = data.won ? "MISSION COMPLETE" : "MISSION FAILED";
+    panel.appendChild(title);
+
+    // Reason
+    if (data.reason) {
+      const reason = document.createElement("p");
+      reason.textContent = data.reason;
+      panel.appendChild(reason);
+    }
+
+    // Stats
+    if (data.stats) {
+      const stats = document.createElement("div");
+      stats.className = "game-over-stats";
+
+      var lines = [
+        "Turns: " + data.stats.turns,
+        "Dossiers: " + data.stats.dossiers,
+        "Health: " + data.stats.health,
+        "Cells Visited: " + data.stats.visited,
+      ];
+
+      for (var i = 0; i < lines.length; i++) {
+        var line = document.createElement("div");
+        line.textContent = lines[i];
+        stats.appendChild(line);
+      }
+
+      panel.appendChild(stats);
+    }
+
+    // Play Again button
+    const btn = document.createElement("button");
+    btn.className = "btn btn--primary";
+    btn.textContent = "Play Again";
+    btn.addEventListener("click", function () {
+      overlay.style.display = "none";
+      if (window.GameControls && window.GameControls.resetGame) {
+        window.GameControls.resetGame();
+      } else {
+        // Fallback: send reset via WebSocket if GameControls not yet loaded
+        overlay.style.display = "none";
+      }
+    });
+    panel.appendChild(btn);
+
+    overlay.appendChild(panel);
+  }
+
+  // ---- 9. updateUI(message) ----
+  function updateUI(message) {
+    if (!message || !message.type) return;
+
+    switch (message.type) {
+      case "turn_update":
+        if (message.state) {
+          renderGrid(message.state);
+          renderHealth(message.state);
+          renderDossierBar(message.state);
+          renderTurnBar(message.state);
+          renderInventory(message.state);
+        }
+        renderActionLog(message.action, message.result);
+        renderScan(message.scan);
+        break;
+
+      case "game_over":
+        renderGameOver(message);
+        break;
+
+      case "error":
+        renderActionLog("", message.message || "Unknown error");
+        // Force damage styling on the last entry
+        var log = document.getElementById("action-log");
+        if (log) {
+          var lastEntry = log.lastElementChild;
+          if (lastEntry) {
+            var resultEl = lastEntry.querySelector(".log-result");
+            if (resultEl) {
+              resultEl.className = "log-result result--damage";
+            }
+          }
+        }
+        break;
+    }
+  }
+
+  // Expose renderer globally
+  window.GameRenderer = {
+    updateUI: updateUI,
+    renderGameOver: renderGameOver,
+    renderGrid: renderGrid,
+    renderHealth: renderHealth,
+    renderDossierBar: renderDossierBar,
+    renderTurnBar: renderTurnBar,
+    renderInventory: renderInventory,
+    renderActionLog: renderActionLog,
+    renderScan: renderScan,
+  };
+})();
+
+// CONTROLS module follows (ISSUE-6)
