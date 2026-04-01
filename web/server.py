@@ -329,6 +329,9 @@ async def handle_start_auto(ws: WebSocket, session: GameSession, data: dict):
 
 async def run_auto_loop(ws: WebSocket, session: GameSession, think_fn):
     """Run the agent loop asynchronously, sending turn updates over WebSocket."""
+    consecutive_errors = 0
+    MAX_CONSECUTIVE_ERRORS = 3
+
     try:
         while session.auto_running:
             # Check end conditions
@@ -345,20 +348,43 @@ async def run_auto_loop(ws: WebSocket, session: GameSession, think_fn):
             session.history.append({"role": "observation", "content": observation})
 
             # 3. Call think function
+            think_error = None
             try:
                 action_text = think_fn(
                     session.operative, session.world, session.history, gemini_client
                 )
             except Exception as e:
-                await ws.send_json({"type": "error", "message": f"think_llm error: {e}"})
-                action_text = "TOOL: scan()"
+                think_error = str(e)
+                action_text = None
                 session.history.append({"role": "error", "content": f"Think error: {e}"})
 
             # 4. Parse and execute
-            try:
-                tool_name, args = parse_tool_call(action_text)
-            except ValueError:
-                tool_name, args = "scan", {}
+            if action_text:
+                try:
+                    tool_name, args = parse_tool_call(action_text)
+                    consecutive_errors = 0
+                except ValueError as e:
+                    think_error = f"Could not parse LLM response: {action_text[:200]}"
+                    tool_name, args = None, None
+            else:
+                tool_name, args = None, None
+
+            # If there was an error, report it and count
+            if think_error:
+                consecutive_errors += 1
+                await ws.send_json({
+                    "type": "error",
+                    "message": f"[Turn {session.turn + 1}] {think_error}",
+                })
+                if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                    await ws.send_json({
+                        "type": "error",
+                        "message": f"Stopped: {consecutive_errors} consecutive errors. Check your API key and system prompt.",
+                    })
+                    break
+                # Skip this turn — don't waste it on a silent scan
+                await asyncio.sleep(1.0)
+                continue
 
             result = session.tools.execute(tool_name, args)
             session.turn += 1
@@ -391,6 +417,7 @@ async def run_auto_loop(ws: WebSocket, session: GameSession, think_fn):
             pass
     finally:
         session.auto_running = False
+        await ws.send_json({"type": "auto_stopped", "reason": "finished"})
 
 
 async def handle_stop_auto(ws: WebSocket, session: GameSession):
@@ -460,6 +487,7 @@ async def check_game_over(ws: WebSocket, session: GameSession):
             "health": op.health,
             "visited": len(op.visited),
         },
+        "log": session.history,
     })
 
 
