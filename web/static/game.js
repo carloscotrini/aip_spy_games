@@ -425,3 +425,334 @@
 })();
 
 // CONTROLS module follows (ISSUE-6)
+// ==========================================================================
+// CONTROLS + WEBSOCKET module (ISSUE-6)
+// ==========================================================================
+
+const GameControls = (function () {
+  let ws = null;
+  let sessionId = null;
+  let mode = "manual";
+  let autoRunning = false;
+  let gameOver = false;
+
+  // -------------------------------------------------------------------
+  // WebSocket client
+  // -------------------------------------------------------------------
+
+  function connectGame(sid) {
+    sessionId = sid;
+    const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+    ws = new WebSocket(protocol + "//" + location.host + "/ws/game/" + sid);
+
+    ws.onmessage = function (event) {
+      let msg;
+      try {
+        msg = JSON.parse(event.data);
+      } catch (e) {
+        return;
+      }
+
+      if (msg.type === "auto_started") {
+        autoRunning = true;
+        updateControlState();
+      } else if (msg.type === "auto_stopped") {
+        autoRunning = false;
+        updateControlState();
+      } else if (msg.type === "game_over") {
+        gameOver = true;
+        updateControlState();
+      }
+
+      GameRenderer.updateUI(msg);
+    };
+
+    ws.onclose = function () {
+      GameRenderer.renderActionLog("", "Disconnected from server.");
+    };
+
+    ws.onerror = function () {
+      GameRenderer.renderActionLog("", "WebSocket error.");
+    };
+  }
+
+  function sendMessage(obj) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(obj));
+    }
+  }
+
+  function sendAction(tool, args) {
+    sendMessage({ type: "manual_action", tool: tool, args: args });
+  }
+
+  function startAuto(systemPrompt, thinkCode) {
+    sendMessage({
+      type: "start_auto",
+      system_prompt: systemPrompt,
+      think_code: thinkCode,
+    });
+  }
+
+  function stopAuto() {
+    sendMessage({ type: "stop_auto" });
+  }
+
+  function resetGame() {
+    sendMessage({ type: "reset" });
+    // Clear action log
+    const log = document.getElementById("action-log");
+    if (log) {
+      const header = log.querySelector(".log-header");
+      log.textContent = "";
+      if (header) log.appendChild(header);
+    }
+    gameOver = false;
+    autoRunning = false;
+    // Hide game over overlay
+    const overlay = document.getElementById("game-over-overlay");
+    if (overlay) overlay.style.display = "none";
+    updateControlState();
+  }
+
+  // -------------------------------------------------------------------
+  // Control state management
+  // -------------------------------------------------------------------
+
+  function updateControlState() {
+    const disabled = autoRunning || gameOver;
+
+    // D-pad buttons
+    for (const id of ["dpad-north", "dpad-south", "dpad-east", "dpad-west"]) {
+      const btn = document.getElementById(id);
+      if (btn) btn.disabled = disabled;
+    }
+
+    // Action buttons
+    const collect = document.getElementById("btn-collect");
+    if (collect) collect.disabled = disabled;
+
+    const talkSend = document.getElementById("talk-send");
+    if (talkSend) talkSend.disabled = disabled;
+    const talkInput = document.getElementById("talk-input");
+    if (talkInput) talkInput.disabled = disabled;
+
+    const fabSend = document.getElementById("fabricate-send");
+    if (fabSend) fabSend.disabled = disabled;
+    const fabInput = document.getElementById("fabricate-input");
+    if (fabInput) fabInput.disabled = disabled;
+
+    // Auto mode buttons
+    const btnRun = document.getElementById("btn-run");
+    if (btnRun) btnRun.disabled = mode !== "auto" || autoRunning || gameOver;
+
+    const btnStop = document.getElementById("btn-stop");
+    if (btnStop) btnStop.disabled = !autoRunning;
+
+    // Mode buttons
+    const btnManual = document.getElementById("btn-manual");
+    const btnAuto = document.getElementById("btn-auto");
+    if (btnManual) btnManual.classList.toggle("btn--primary", mode === "manual");
+    if (btnAuto) btnAuto.classList.toggle("btn--primary", mode === "auto");
+
+    // Show/hide sections based on mode
+    const controlsArea = document.getElementById("controls-area");
+    const editorArea = document.getElementById("editor-area");
+
+    if (mode === "manual") {
+      if (controlsArea) controlsArea.style.display = "";
+      if (editorArea) editorArea.classList.add("editor-panel--collapsed");
+    } else {
+      if (controlsArea) controlsArea.style.display = "";
+      if (editorArea) editorArea.classList.remove("editor-panel--collapsed");
+    }
+  }
+
+  // -------------------------------------------------------------------
+  // Event binding
+  // -------------------------------------------------------------------
+
+  function bindControls() {
+    // D-pad
+    const directions = { "dpad-north": "north", "dpad-south": "south", "dpad-east": "east", "dpad-west": "west" };
+    for (const [id, dir] of Object.entries(directions)) {
+      const btn = document.getElementById(id);
+      if (btn) btn.addEventListener("click", function () { sendAction("move", { direction: dir }); });
+    }
+
+    // Keyboard controls
+    document.addEventListener("keydown", function (e) {
+      // Skip if a textarea or input is focused
+      const tag = document.activeElement && document.activeElement.tagName;
+      if (tag === "TEXTAREA" || tag === "INPUT") return;
+      if (autoRunning || gameOver) return;
+
+      const keyMap = {
+        ArrowUp: "north", w: "north", W: "north",
+        ArrowDown: "south", s: "south", S: "south",
+        ArrowLeft: "west", a: "west", A: "west",
+        ArrowRight: "east", d: "east", D: "east",
+      };
+      const dir = keyMap[e.key];
+      if (dir) {
+        e.preventDefault();
+        sendAction("move", { direction: dir });
+      }
+    });
+
+    // Collect
+    const collectBtn = document.getElementById("btn-collect");
+    if (collectBtn) collectBtn.addEventListener("click", function () { sendAction("collect", {}); });
+
+    // Talk
+    const talkInput = document.getElementById("talk-input");
+    const talkSend = document.getElementById("talk-send");
+    function doTalk() {
+      const val = talkInput ? talkInput.value.trim() : "";
+      if (!val) return;
+      sendAction("talk", { message: val });
+      if (talkInput) talkInput.value = "";
+    }
+    if (talkSend) talkSend.addEventListener("click", doTalk);
+    if (talkInput) talkInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); doTalk(); }
+    });
+
+    // Fabricate
+    const fabInput = document.getElementById("fabricate-input");
+    const fabSend = document.getElementById("fabricate-send");
+    function doFabricate() {
+      const val = fabInput ? fabInput.value.trim() : "";
+      if (!val) return;
+      sendAction("fabricate", { item: val });
+      if (fabInput) fabInput.value = "";
+    }
+    if (fabSend) fabSend.addEventListener("click", doFabricate);
+    if (fabInput) fabInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); doFabricate(); }
+    });
+
+    // Mode switching
+    const btnManual = document.getElementById("btn-manual");
+    const btnAuto = document.getElementById("btn-auto");
+    if (btnManual) btnManual.addEventListener("click", function () {
+      mode = "manual";
+      updateControlState();
+    });
+    if (btnAuto) btnAuto.addEventListener("click", function () {
+      mode = "auto";
+      updateControlState();
+    });
+
+    // Run / Stop
+    const btnRun = document.getElementById("btn-run");
+    if (btnRun) btnRun.addEventListener("click", function () {
+      const sysPrompt = document.getElementById("system-prompt");
+      const thinkCode = document.getElementById("think-code");
+      const sp = sysPrompt ? sysPrompt.value : "";
+      const tc = thinkCode ? thinkCode.value : "";
+      if (!tc.trim()) {
+        GameRenderer.renderActionLog("", "No think_llm code provided.");
+        return;
+      }
+      startAuto(sp, tc);
+    });
+
+    const btnStop = document.getElementById("btn-stop");
+    if (btnStop) btnStop.addEventListener("click", function () { stopAuto(); });
+
+    // Reset
+    const btnReset = document.getElementById("btn-reset");
+    if (btnReset) btnReset.addEventListener("click", function () { resetGame(); });
+
+    // Editor collapse toggle
+    const editorToggle = document.getElementById("editor-toggle");
+    const editorArea = document.getElementById("editor-area");
+    if (editorToggle && editorArea) {
+      editorToggle.addEventListener("click", function () {
+        editorArea.classList.toggle("editor-panel--collapsed");
+      });
+    }
+
+    // Tab key in textareas — insert 4 spaces
+    for (const id of ["system-prompt", "think-code"]) {
+      const ta = document.getElementById(id);
+      if (ta) {
+        ta.addEventListener("keydown", function (e) {
+          if (e.key === "Tab") {
+            e.preventDefault();
+            const start = ta.selectionStart;
+            const end = ta.selectionEnd;
+            ta.value = ta.value.substring(0, start) + "    " + ta.value.substring(end);
+            ta.selectionStart = ta.selectionEnd = start + 4;
+          }
+        });
+      }
+    }
+
+    // localStorage persistence for editor
+    const sysPromptEl = document.getElementById("system-prompt");
+    const thinkCodeEl = document.getElementById("think-code");
+
+    if (sysPromptEl) {
+      sysPromptEl.addEventListener("input", function () {
+        localStorage.setItem("spy_system_prompt", sysPromptEl.value);
+      });
+    }
+    if (thinkCodeEl) {
+      thinkCodeEl.addEventListener("input", function () {
+        localStorage.setItem("spy_think_code", thinkCodeEl.value);
+      });
+    }
+  }
+
+  // -------------------------------------------------------------------
+  // Restore editor from localStorage
+  // -------------------------------------------------------------------
+
+  function restoreEditor() {
+    const savedPrompt = localStorage.getItem("spy_system_prompt");
+    const savedCode = localStorage.getItem("spy_think_code");
+    const sysPromptEl = document.getElementById("system-prompt");
+    const thinkCodeEl = document.getElementById("think-code");
+
+    if (savedPrompt && sysPromptEl) sysPromptEl.value = savedPrompt;
+    if (savedCode && thinkCodeEl) thinkCodeEl.value = savedCode;
+  }
+
+  // -------------------------------------------------------------------
+  // Initialization
+  // -------------------------------------------------------------------
+
+  function init() {
+    bindControls();
+    restoreEditor();
+    updateControlState();
+
+    fetch("/api/game/new", { method: "POST" })
+      .then(function (r) { return r.json(); })
+      .then(function (resp) {
+        sessionId = resp.session_id;
+        connectGame(sessionId);
+
+        // Render initial state
+        GameRenderer.updateUI({
+          type: "turn_update",
+          turn: 0,
+          action: "",
+          result: resp.mission_briefing,
+          scan: "",
+          state: resp.state,
+        });
+      })
+      .catch(function (err) {
+        GameRenderer.renderActionLog("", "Failed to create game: " + err.message);
+      });
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+
+  return { connectGame, sendAction, startAuto, stopAuto, resetGame };
+})();
+
+window.GameControls = GameControls;
