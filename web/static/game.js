@@ -571,11 +571,10 @@ const GameControls = (function () {
     sendMessage({ type: "manual_action", tool: tool, args: args });
   }
 
-  function startAuto(systemPrompt, thinkCode) {
+  function startAuto(systemPrompt) {
     sendMessage({
       type: "start_auto",
       system_prompt: systemPrompt,
-      think_code: thinkCode,
     });
   }
 
@@ -733,14 +732,12 @@ const GameControls = (function () {
     const btnRun = document.getElementById("btn-run");
     if (btnRun) btnRun.addEventListener("click", function () {
       const sysPrompt = document.getElementById("system-prompt");
-      const thinkCode = document.getElementById("think-code");
       const sp = sysPrompt ? sysPrompt.value : "";
-      const tc = thinkCode ? thinkCode.value : "";
-      if (!tc.trim()) {
-        GameRenderer.renderActionLog("", "No think_llm code provided.");
+      if (!sp.trim()) {
+        GameRenderer.renderActionLog("", "Please provide a system prompt before running the agent.");
         return;
       }
-      startAuto(sp, tc);
+      startAuto(sp);
     });
 
     const btnStop = document.getElementById("btn-stop");
@@ -760,7 +757,7 @@ const GameControls = (function () {
     }
 
     // Tab key in textareas — insert 4 spaces
-    for (const id of ["system-prompt", "think-code"]) {
+    for (const id of ["system-prompt"]) {
       const ta = document.getElementById(id);
       if (ta) {
         ta.addEventListener("keydown", function (e) {
@@ -777,16 +774,10 @@ const GameControls = (function () {
 
     // localStorage persistence for editor
     const sysPromptEl = document.getElementById("system-prompt");
-    const thinkCodeEl = document.getElementById("think-code");
 
     if (sysPromptEl) {
       sysPromptEl.addEventListener("input", function () {
         localStorage.setItem("spy_system_prompt", sysPromptEl.value);
-      });
-    }
-    if (thinkCodeEl) {
-      thinkCodeEl.addEventListener("input", function () {
-        localStorage.setItem("spy_think_code", thinkCodeEl.value);
       });
     }
   }
@@ -797,12 +788,9 @@ const GameControls = (function () {
 
   function restoreEditor() {
     const savedPrompt = localStorage.getItem("spy_system_prompt");
-    const savedCode = localStorage.getItem("spy_think_code");
     const sysPromptEl = document.getElementById("system-prompt");
-    const thinkCodeEl = document.getElementById("think-code");
 
     if (savedPrompt && sysPromptEl) sysPromptEl.value = savedPrompt;
-    if (savedCode && thinkCodeEl) thinkCodeEl.value = savedCode;
   }
 
   // -------------------------------------------------------------------
