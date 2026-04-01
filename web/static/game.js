@@ -378,6 +378,13 @@
       panel.appendChild(stats);
     }
 
+    // Button row
+    const btnRow = document.createElement("div");
+    btnRow.style.display = "flex";
+    btnRow.style.gap = "8px";
+    btnRow.style.justifyContent = "center";
+    btnRow.style.marginTop = "12px";
+
     // Play Again button
     const btn = document.createElement("button");
     btn.className = "btn btn--primary";
@@ -387,12 +394,35 @@
       if (window.GameControls && window.GameControls.resetGame) {
         window.GameControls.resetGame();
       } else {
-        // Fallback: send reset via WebSocket if GameControls not yet loaded
         overlay.style.display = "none";
       }
     });
-    panel.appendChild(btn);
+    btnRow.appendChild(btn);
 
+    // Download Log button
+    if (data.log) {
+      const dlBtn = document.createElement("button");
+      dlBtn.className = "btn btn--success";
+      dlBtn.textContent = "\u{1F4BE} Download Log";
+      dlBtn.addEventListener("click", function () {
+        var logData = {
+          outcome: data.won ? "mission_complete" : "mission_failed",
+          reason: data.reason,
+          stats: data.stats,
+          history: data.log,
+        };
+        var blob = new Blob([JSON.stringify(logData, null, 2)], { type: "application/json" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = "game_log_" + (data.won ? "win" : "fail") + "_" + Date.now() + ".json";
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+      btnRow.appendChild(dlBtn);
+    }
+
+    panel.appendChild(btnRow);
     overlay.appendChild(panel);
   }
 

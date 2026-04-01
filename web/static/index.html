@@ -109,8 +109,15 @@
     </div>
 
     <label for="system-prompt">Tell the LLM who it is, what tools it has, and how to respond:</label>
-    <textarea id="system-prompt" class="prompt-textarea" rows="12"
-      placeholder="You are a spy operative on a 3x3 grid. Your goal is to collect 3 dossiers in 30 turns.&#10;&#10;Available tools (use exactly one per turn):&#10;  TOOL: move(direction=&quot;north|south|east|west&quot;)&#10;  TOOL: talk(message=&quot;your message&quot;)&#10;  TOOL: collect()&#10;  TOOL: fabricate(item=&quot;item name&quot;)&#10;&#10;Respond with exactly one TOOL: line."></textarea>
+    <textarea id="system-prompt" class="prompt-textarea" rows="12">You are a spy. Collect 3 dossiers on a 3x3 grid in 30 turns.
+
+Talk to every informant you meet. Ask about "jobs". If you have an item to deliver, say its name. Use collect() on caches. Explore every cell.
+
+Tools (respond with exactly one per turn):
+TOOL: move(direction="north|south|east|west")
+TOOL: talk(message="your message")
+TOOL: collect()
+TOOL: fabricate(item="item name")</textarea>
   </section>
 
   <!-- Action Log -->
