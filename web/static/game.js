@@ -571,11 +571,10 @@ const GameControls = (function () {
     sendMessage({ type: "manual_action", tool: tool, args: args });
   }
 
-  function startAuto(systemPrompt, thinkCode) {
+  function startAuto(systemPrompt) {
     sendMessage({
       type: "start_auto",
       system_prompt: systemPrompt,
-      think_code: thinkCode,
     });
   }
 
@@ -733,14 +732,12 @@ const GameControls = (function () {
     const btnRun = document.getElementById("btn-run");
     if (btnRun) btnRun.addEventListener("click", function () {
       const sysPrompt = document.getElementById("system-prompt");
-      const thinkCode = document.getElementById("think-code");
       const sp = sysPrompt ? sysPrompt.value : "";
-      const tc = thinkCode ? thinkCode.value : "";
-      if (!tc.trim()) {
-        GameRenderer.renderActionLog("", "No think_llm code provided.");
+      if (!sp.trim()) {
+        GameRenderer.renderActionLog("", "Please provide a system prompt before running the agent.");
         return;
       }
-      startAuto(sp, tc);
+      startAuto(sp);
     });
 
     const btnStop = document.getElementById("btn-stop");
@@ -749,6 +746,42 @@ const GameControls = (function () {
     // Reset
     const btnReset = document.getElementById("btn-reset");
     if (btnReset) btnReset.addEventListener("click", function () { resetGame(); });
+
+    // API key
+    const apiKeyInput = document.getElementById("api-key");
+    const btnSaveKey = document.getElementById("btn-save-key");
+    const apiKeyStatus = document.getElementById("api-key-status");
+
+    function saveApiKey() {
+      const key = apiKeyInput ? apiKeyInput.value.trim() : "";
+      if (!key) return;
+      fetch("/api/key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ api_key: key }),
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (resp) {
+          if (apiKeyStatus) {
+            apiKeyStatus.textContent = resp.message;
+            apiKeyStatus.className = "api-key-status " + (resp.ok ? "api-key--ok" : "api-key--err");
+          }
+          if (resp.ok && apiKeyInput) {
+            localStorage.setItem("spy_gemini_key", key);
+          }
+        })
+        .catch(function (err) {
+          if (apiKeyStatus) {
+            apiKeyStatus.textContent = "Network error: " + err.message;
+            apiKeyStatus.className = "api-key-status api-key--err";
+          }
+        });
+    }
+
+    if (btnSaveKey) btnSaveKey.addEventListener("click", saveApiKey);
+    if (apiKeyInput) apiKeyInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); saveApiKey(); }
+    });
 
     // Editor collapse toggle
     const editorToggle = document.getElementById("editor-toggle");
@@ -760,7 +793,7 @@ const GameControls = (function () {
     }
 
     // Tab key in textareas — insert 4 spaces
-    for (const id of ["system-prompt", "think-code"]) {
+    for (const id of ["system-prompt"]) {
       const ta = document.getElementById(id);
       if (ta) {
         ta.addEventListener("keydown", function (e) {
@@ -777,16 +810,10 @@ const GameControls = (function () {
 
     // localStorage persistence for editor
     const sysPromptEl = document.getElementById("system-prompt");
-    const thinkCodeEl = document.getElementById("think-code");
 
     if (sysPromptEl) {
       sysPromptEl.addEventListener("input", function () {
         localStorage.setItem("spy_system_prompt", sysPromptEl.value);
-      });
-    }
-    if (thinkCodeEl) {
-      thinkCodeEl.addEventListener("input", function () {
-        localStorage.setItem("spy_think_code", thinkCodeEl.value);
       });
     }
   }
@@ -797,12 +824,41 @@ const GameControls = (function () {
 
   function restoreEditor() {
     const savedPrompt = localStorage.getItem("spy_system_prompt");
-    const savedCode = localStorage.getItem("spy_think_code");
     const sysPromptEl = document.getElementById("system-prompt");
-    const thinkCodeEl = document.getElementById("think-code");
-
     if (savedPrompt && sysPromptEl) sysPromptEl.value = savedPrompt;
-    if (savedCode && thinkCodeEl) thinkCodeEl.value = savedCode;
+
+    // Restore saved API key and check status
+    const savedKey = localStorage.getItem("spy_gemini_key");
+    const apiKeyInput = document.getElementById("api-key");
+    if (savedKey && apiKeyInput) apiKeyInput.value = savedKey;
+
+    // Check current key status from server
+    fetch("/api/key/status")
+      .then(function (r) { return r.json(); })
+      .then(function (resp) {
+        const apiKeyStatus = document.getElementById("api-key-status");
+        if (!apiKeyStatus) return;
+        if (resp.configured) {
+          apiKeyStatus.textContent = "Key active";
+          apiKeyStatus.className = "api-key-status api-key--ok";
+        } else if (savedKey) {
+          // Have a saved key but server doesn't — re-send it
+          fetch("/api/key", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ api_key: savedKey }),
+          })
+            .then(function (r) { return r.json(); })
+            .then(function (r2) {
+              apiKeyStatus.textContent = r2.ok ? "Key active" : r2.message;
+              apiKeyStatus.className = "api-key-status " + (r2.ok ? "api-key--ok" : "api-key--err");
+            });
+        } else {
+          apiKeyStatus.textContent = "No key set";
+          apiKeyStatus.className = "api-key-status api-key--err";
+        }
+      })
+      .catch(function () {});
   }
 
   // -------------------------------------------------------------------

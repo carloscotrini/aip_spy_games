@@ -274,43 +274,91 @@ def _save_game_log(game_log: list[dict], operative: Operative) -> str:
 # LLM-powered think function (students implement this)
 # ---------------------------------------------------------------------------
 
-def think_llm(operative: Operative, world: GameWorld, history: list[dict], client) -> str:
+def think_llm(
+    operative: Operative,
+    world: GameWorld,
+    history: list[dict],
+    client,
+    *,
+    system_prompt: str = "",
+) -> str:
     """Decide the next action using an LLM.
 
-    TODO: Implement this function.
+    Everything is implemented except the system prompt — supply it via the
+    ``system_prompt`` keyword argument.  The prompt should tell the LLM who it
+    is, what its goal is, which tools are available, and that it must respond
+    with exactly one ``TOOL:`` call.
 
-    Steps:
-    1. Build a system message that includes:
-       - The agent's role (you are a spy operative, goal is 10 dossiers)
-       - The TOOLS_DESCRIPTION (so the LLM knows what tools are available)
-       - Instructions to respond with exactly one TOOL: call
-
-    2. Build a user message that includes:
-       - Current operative status (use operative.status_text())
-       - Recent history (last ~10 entries from the history list)
-       - Current cell description
-       - The operative's journal entries (key past informant conversations)
-
-    3. Call client.models.generate_content() with:
-       - model="gemini-2.5-flash"
-       - contents=<your user message>
-       - config=genai.types.GenerateContentConfig(
-             system_instruction=<your system message>,
-             max_output_tokens=500,
-         )
-
-    4. Return response.text
+    The following constants are available for inclusion in a prompt:
+    - ``MISSION_BRIEFING`` — background lore & tactical advice
+    - ``TOOLS_DESCRIPTION`` — documentation for the four available tools
 
     Args:
         operative: Current operative state.
         world: The game world.
         history: Conversation history from the game loop.
-        client: A genai.Client() instance.
+        client: A ``genai.Client()`` instance.
+        system_prompt: The system instruction for the LLM (student-provided).
 
     Returns:
         str: The LLM's response containing a TOOL: call.
     """
-    # ========================
-    # YOUR CODE HERE
-    # ========================
-    raise NotImplementedError("TODO: Implement think_llm")
+    from google import genai
+
+    # ------------------------------------------------------------------ #
+    # 1. System message — provided by the caller / student               #
+    # ------------------------------------------------------------------ #
+    if not system_prompt:
+        raise ValueError(
+            "system_prompt is empty. Provide a prompt that describes the "
+            "agent's role, available tools, and expected response format."
+        )
+
+    # ------------------------------------------------------------------ #
+    # 2. User message — current game state + recent history              #
+    # ------------------------------------------------------------------ #
+    # Current cell description
+    r, c = operative.position
+    cell = world.grid[r][c]
+    cell_desc = getattr(cell, "description", str(cell))
+
+    # Recent history (last ~10 entries)
+    recent = history[-10:]
+    transcript_parts = []
+    for entry in recent:
+        role = entry.get("role", "")
+        content = entry.get("content", "")
+        transcript_parts.append(f"[{role.upper()}] {content}")
+    transcript = "\n".join(transcript_parts)
+
+    # Journal entries (key NPC conversations)
+    journal_text = ""
+    if operative.journal:
+        journal_text = "\n\nJOURNAL (key past conversations):\n" + "\n".join(
+            f"- {j}" for j in operative.journal
+        )
+
+    user_message = (
+        f"OPERATIVE STATUS: {operative.status_text()}\n\n"
+        f"CURRENT CELL: {cell_desc}\n\n"
+        f"RECENT HISTORY:\n{transcript}"
+        f"{journal_text}\n\n"
+        f"What do you do next? Respond with exactly one TOOL: call."
+    )
+
+    # ------------------------------------------------------------------ #
+    # 3. Call the Gemini API                                             #
+    # ------------------------------------------------------------------ #
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=user_message,
+        config=genai.types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            max_output_tokens=500,
+        ),
+    )
+
+    # ------------------------------------------------------------------ #
+    # 4. Return response text                                            #
+    # ------------------------------------------------------------------ #
+    return response.text

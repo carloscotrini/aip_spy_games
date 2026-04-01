@@ -6,7 +6,6 @@ import sys
 import os
 import asyncio
 import logging
-import textwrap
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -21,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from hidden_layer.operative import Operative
 from hidden_layer.tools import GameTools, ToolResult
 from hidden_layer.oracle import llm_oracle
-from hidden_layer.agent import MISSION_BRIEFING, TOOLS_DESCRIPTION, parse_tool_call
+from hidden_layer.agent import MISSION_BRIEFING, TOOLS_DESCRIPTION, parse_tool_call, think_llm
 from hidden_layer.serialization import game_state_to_dict, turn_event_to_dict
 from hidden_layer.micro_mission import (
     MicroGameWorld,
@@ -39,20 +38,30 @@ logging.basicConfig(level=logging.INFO)
 # Gemini client setup
 # ---------------------------------------------------------------------------
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 gemini_client = None
 
-if GEMINI_API_KEY:
+
+def _init_gemini(api_key: str) -> bool:
+    """Initialise (or re-initialise) the Gemini client. Returns True on success."""
+    global gemini_client
     try:
         from google import genai
-        gemini_client = genai.Client(api_key=GEMINI_API_KEY)
-        logger.info("Gemini client initialized. LLM oracle and auto mode available.")
+        gemini_client = genai.Client(api_key=api_key)
+        logger.info("Gemini client initialized.")
+        return True
     except Exception as e:
         logger.warning(f"Failed to initialize Gemini client: {e}")
+        gemini_client = None
+        return False
+
+
+# Try env var on startup
+_env_key = os.environ.get("GEMINI_API_KEY", "")
+if _env_key:
+    _init_gemini(_env_key)
 else:
     logger.warning(
-        "GEMINI_API_KEY not set. Using stub oracle. "
-        "Auto mode LLM calls will be rejected."
+        "GEMINI_API_KEY not set. Provide it via the web UI or set the env var."
     )
 
 # ---------------------------------------------------------------------------
@@ -161,6 +170,28 @@ async def get_game(session_id: str):
     return {"session_id": session_id, "state": state}
 
 
+@app.get("/api/key/status")
+async def key_status():
+    """Check whether a Gemini API key is configured."""
+    return {"configured": gemini_client is not None}
+
+
+@app.post("/api/key")
+async def set_api_key(payload: dict):
+    """Set the Gemini API key at runtime."""
+    api_key = payload.get("api_key", "").strip()
+    if not api_key:
+        return {"ok": False, "message": "API key is empty."}
+    if _init_gemini(api_key):
+        # Update oracle on existing sessions to use LLM
+        for session in sessions.values():
+            session.tools.set_oracle(
+                lambda npc, q, o: llm_oracle(npc, q, o, gemini_client)
+            )
+        return {"ok": True, "message": "API key saved. LLM oracle and auto mode are now available."}
+    return {"ok": False, "message": "Failed to initialize Gemini client with that key."}
+
+
 # ---------------------------------------------------------------------------
 # WebSocket endpoint
 # ---------------------------------------------------------------------------
@@ -261,40 +292,33 @@ async def handle_manual_action(ws: WebSocket, session: GameSession, data: dict):
 # ---------------------------------------------------------------------------
 
 async def handle_start_auto(ws: WebSocket, session: GameSession, data: dict):
-    """Compile user's think function and start the auto agent loop."""
+    """Start the auto agent loop using the user-provided system prompt."""
     if session.auto_running:
         await ws.send_json({"type": "error", "message": "Auto mode is already running."})
         return
 
-    think_code = data.get("think_code", "")
-    system_prompt = data.get("system_prompt", "")
+    system_prompt = data.get("system_prompt", "").strip()
 
-    # Check if code references client but no API key
-    if not gemini_client and "client" in think_code:
+    if not system_prompt:
         await ws.send_json({
             "type": "error",
-            "message": "No Gemini API key configured. Set GEMINI_API_KEY to use LLM calls in auto mode.",
+            "message": "Please provide a system prompt before running the agent.",
         })
         return
 
-    # Compile think function
-    try:
-        code = "def think_llm(operative, world, history, client):\n"
-        code += "    SYSTEM_PROMPT = system_prompt\n"
-        code += textwrap.indent(think_code, "    ")
-        namespace = {
-            "MISSION_BRIEFING": MICRO_MISSION_BRIEFING,
-            "TOOLS_DESCRIPTION": TOOLS_DESCRIPTION,
-            "system_prompt": system_prompt,
-        }
-        if gemini_client:
-            from google import genai
-            namespace["genai"] = genai
-        exec(code, namespace)
-        think_fn = namespace["think_llm"]
-    except Exception as e:
-        await ws.send_json({"type": "error", "message": f"Code compilation error: {e}"})
+    if not gemini_client:
+        await ws.send_json({
+            "type": "error",
+            "message": "No Gemini API key configured. Set GEMINI_API_KEY to use auto mode.",
+        })
         return
+
+    # Wrap think_llm with the user's system prompt baked in
+    def think_fn(operative, world, history, client):
+        return think_llm(
+            operative, world, history, client,
+            system_prompt=system_prompt,
+        )
 
     session.auto_running = True
     session.auto_task = asyncio.create_task(
