@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>THE HIDDEN LAYER — Micro Mission</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Title Bar -->
+  <header id="title-bar">
+    <h1>&#x1F575;&#xFE0F; THE HIDDEN LAYER &mdash; MICRO MISSION</h1>
+    <nav>
+      <button id="btn-manual" class="btn">Manual</button>
+      <button id="btn-auto" class="btn">Auto</button>
+      <button id="btn-reset" class="btn btn--warning">Reset</button>
+    </nav>
+  </header>
+
+  <!-- Game Area: Map + Stats -->
+  <section id="game-area">
+    <div id="game-map" class="game-grid"></div>
+
+    <div id="stats-panel">
+      <div id="turn-bar" class="turn-bar">
+        <span class="bar-label">Turn</span>
+        <div class="bar-track"><div class="bar-fill"></div></div>
+        <span class="bar-text"></span>
+      </div>
+
+      <div id="health-bar" class="health-bar"></div>
+
+      <div id="dossier-bar" class="dossier-bar">
+        <span class="bar-label">Dossiers</span>
+        <div class="bar-track"><div class="bar-fill"></div></div>
+        <span class="bar-text"></span>
+      </div>
+
+      <div id="inventory">
+        <span class="bar-label">Inventory</span>
+        <div class="inventory-items"></div>
+      </div>
+
+      <div id="scan-panel">
+        <span class="bar-label">&#x1F4E1; Scan</span>
+        <pre class="scan-text"></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- Controls Area -->
+  <section id="controls-area">
+    <div class="controls-row">
+      <!-- D-Pad -->
+      <div class="dpad">
+        <div></div>
+        <button id="dpad-north" class="btn btn--primary">&uarr;</button>
+        <div></div>
+        <button id="dpad-west" class="btn btn--primary">&larr;</button>
+        <div class="dpad-center"></div>
+        <button id="dpad-east" class="btn btn--primary">&rarr;</button>
+        <div></div>
+        <button id="dpad-south" class="btn btn--primary">&darr;</button>
+        <div></div>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="action-controls">
+        <button id="btn-collect" class="btn btn--success">&#x270B; Collect</button>
+
+        <div class="input-group">
+          <input type="text" id="talk-input" class="input-field" placeholder="Message...">
+          <button id="talk-send" class="btn btn--primary">&#x1F4AC; Send</button>
+        </div>
+
+        <div class="input-group">
+          <input type="text" id="fabricate-input" class="input-field" placeholder="Item name...">
+          <button id="fabricate-send" class="btn btn--primary">&#x1F527; Build</button>
+        </div>
+
+        <div class="auto-controls">
+          <button id="btn-run" class="btn btn--success">&#x25B6; Run Agent</button>
+          <button id="btn-stop" class="btn btn--danger">&#x23F9; Stop</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Code Editor -->
+  <section id="editor-area" class="editor-panel">
+    <div class="editor-header">
+      <span>&#x1F4DD; AGENT CODE</span>
+      <button id="editor-toggle" class="btn">&#x25BC; collapse</button>
+    </div>
+
+    <label for="system-prompt">System Prompt:</label>
+    <textarea id="system-prompt" class="prompt-textarea" rows="6"
+      placeholder="You are a spy on a 3x3 grid. Collect 3 dossiers in 30 turns.&#10;&#10;Tools:&#10;  TOOL: move(direction=&quot;north|south|east|west&quot;)&#10;  TOOL: talk(message=&quot;hello&quot;)&#10;  TOOL: collect()&#10;&#10;Respond with exactly one TOOL: line."></textarea>
+
+    <div class="editor-signature">def think_llm(operative, world, history, client):</div>
+    <textarea id="think-code" class="code-textarea" rows="12"
+      placeholder="transcript = []&#10;for h in history[-20:]:&#10;    if h[&quot;role&quot;] == &quot;observation&quot;:&#10;        transcript.append(f&quot;SCAN: {h['content']}&quot;)&#10;    elif h[&quot;role&quot;] == &quot;action&quot;:&#10;        transcript.append(f&quot;ACTION: {h['content']}&quot;)&#10;    elif h[&quot;role&quot;] == &quot;result&quot;:&#10;        transcript.append(f&quot;RESULT: {h['content']}&quot;)&#10;&#10;user_msg = &quot;\n&quot;.join(transcript) + &quot;\n\nWhat do you do next?&quot;&#10;&#10;response = client.models.generate_content(&#10;    model=&quot;gemini-2.5-flash&quot;,&#10;    contents=user_msg,&#10;    config=genai.types.GenerateContentConfig(&#10;        system_instruction=SYSTEM_PROMPT,&#10;        max_output_tokens=200,&#10;    ),&#10;)&#10;return response.text"></textarea>
+  </section>
+
+  <!-- Action Log -->
+  <section id="action-log" class="action-log">
+    <div class="log-header">Action Log</div>
+  </section>
+
+  <!-- Game Over Overlay (hidden) -->
+  <div id="game-over-overlay" class="game-over-overlay" style="display:none;"></div>
+
+  <footer>BMAI FS26 &mdash; ETH Z&uuml;rich</footer>
+
+  <script src="game.js" defer></script>
+</body>
+</html>
