@@ -483,6 +483,16 @@
         }
         var portrait = detectPortraitKey(message.state, message.action);
         renderActionLog(message.action, message.result, portrait);
+        // Show LLM debug info if there were errors
+        if (message.think_error) {
+          renderActionLog("", "\u26a0\ufe0f think_llm error: " + message.think_error);
+        }
+        if (message.parse_error) {
+          renderActionLog("", "\u26a0\ufe0f Parse error: " + message.parse_error);
+        }
+        if (message.llm_raw && (message.think_error || message.parse_error || (message.action && message.action.startsWith("scan")))) {
+          renderActionLog("", "\u{1F916} LLM raw: " + message.llm_raw);
+        }
         renderScan(message.scan);
         // Show spinner if auto mode is running (next turn coming)
         if (window._autoRunning && message.state && message.state.is_alive && !message.state.has_won) {
@@ -776,6 +786,31 @@ const GameControls = (function () {
     // Reset
     const btnReset = document.getElementById("btn-reset");
     if (btnReset) btnReset.addEventListener("click", function () { resetGame(); });
+
+    // Download Log
+    const btnDownloadLog = document.getElementById("btn-download-log");
+    if (btnDownloadLog) btnDownloadLog.addEventListener("click", function () {
+      if (!sessionId) {
+        GameRenderer.renderActionLog("", "No active session.");
+        return;
+      }
+      fetch("/api/game/" + sessionId + "/log")
+        .then(function (r) { return r.json(); })
+        .then(function (logData) {
+          var blob = new Blob([JSON.stringify(logData, null, 2)], { type: "application/json" });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement("a");
+          a.href = url;
+          a.download = "game_log_" + sessionId + ".json";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        })
+        .catch(function (err) {
+          GameRenderer.renderActionLog("", "Failed to download log: " + err.message);
+        });
+    });
 
     // API key
     const apiKeyInput = document.getElementById("api-key");

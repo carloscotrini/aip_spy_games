@@ -82,6 +82,7 @@ class GameSession:
     auto_running: bool = False
     auto_task: asyncio.Task | None = None
     last_active: float = field(default_factory=time.time)
+    game_log: list = field(default_factory=list)  # structured debug log
 
 
 sessions: dict[str, GameSession] = {}
@@ -168,6 +169,35 @@ async def get_game(session_id: str):
     session.last_active = time.time()
     state = game_state_to_dict(session.operative, session.world, session.turn, session.max_turns)
     return {"session_id": session_id, "state": state}
+
+
+@app.get("/api/game/{session_id}/log")
+async def get_game_log(session_id: str):
+    """Download the structured game log for debugging."""
+    session = sessions.get(session_id)
+    if not session:
+        return {"error": "Session not found"}
+
+    op = session.operative
+    outcome = "in_progress"
+    if not op.is_alive:
+        outcome = "mission_failed_dead"
+    elif op.has_won:
+        outcome = "mission_complete"
+    elif session.turn >= session.max_turns:
+        outcome = "mission_failed_turns"
+
+    return {
+        "session_id": session_id,
+        "outcome": outcome,
+        "final_dossiers": op.dossiers,
+        "final_health": op.health,
+        "final_inventory": list(op.inventory),
+        "total_turns": session.turn,
+        "max_turns": session.max_turns,
+        "journal": list(op.journal),
+        "turns": session.game_log,
+    }
 
 
 @app.get("/api/key/status")
@@ -283,6 +313,20 @@ async def handle_manual_action(ws: WebSocket, session: GameSession, data: dict):
     session.history.append({"role": "action", "content": action_str})
     session.history.append({"role": "result", "content": result.message})
 
+    # Append to game log
+    session.game_log.append({
+        "turn": session.turn,
+        "mode": "manual",
+        "position": list(session.operative.position),
+        "health": session.operative.health,
+        "dossiers": session.operative.dossiers,
+        "inventory": list(session.operative.inventory),
+        "observation": scan_result,
+        "action": action_str,
+        "result": result.message,
+        "success": result.success,
+    })
+
     # Check end conditions
     await check_game_over(ws, session)
 
@@ -347,14 +391,18 @@ async def run_auto_loop(ws: WebSocket, session: GameSession, think_fn):
                 observation = MICRO_MISSION_BRIEFING + "\n" + observation
             session.history.append({"role": "observation", "content": observation})
 
-            # 3. Call think function
+            # 3. Call think function — capture raw response and errors
+            llm_raw = None
             think_error = None
+            parse_error = None
             try:
                 action_text = think_fn(
                     session.operative, session.world, session.history, gemini_client
                 )
+                llm_raw = action_text
             except Exception as e:
                 think_error = str(e)
+                logger.warning(f"think_llm error (turn {session.turn}): {e}")
                 action_text = None
                 session.history.append({"role": "error", "content": f"Think error: {e}"})
 
@@ -364,14 +412,30 @@ async def run_auto_loop(ws: WebSocket, session: GameSession, think_fn):
                     tool_name, args = parse_tool_call(action_text)
                     consecutive_errors = 0
                 except ValueError as e:
+                    parse_error = str(e)
                     think_error = f"Could not parse LLM response: {action_text[:200]}"
                     tool_name, args = None, None
             else:
                 tool_name, args = None, None
 
-            # If there was an error, report it and count
-            if think_error:
+            # If there was an error, log it and count
+            if think_error or (tool_name is None):
                 consecutive_errors += 1
+                # Log the failed turn
+                session.game_log.append({
+                    "turn": session.turn,
+                    "position": list(session.operative.position),
+                    "health": session.operative.health,
+                    "dossiers": session.operative.dossiers,
+                    "inventory": list(session.operative.inventory),
+                    "observation": observation,
+                    "llm_raw_response": llm_raw,
+                    "think_error": think_error,
+                    "parse_error": parse_error,
+                    "action": None,
+                    "result": None,
+                    "success": False,
+                })
                 await ws.send_json({
                     "type": "error",
                     "message": f"[Turn {session.turn + 1}] {think_error}",
@@ -394,23 +458,47 @@ async def run_auto_loop(ws: WebSocket, session: GameSession, think_fn):
             session.history.append({"role": "action", "content": action_str})
             session.history.append({"role": "result", "content": result.message})
 
-            # 5. Send turn update
+            # 5. Append to structured game log
+            log_entry = {
+                "turn": session.turn,
+                "position": list(session.operative.position),
+                "health": session.operative.health,
+                "dossiers": session.operative.dossiers,
+                "inventory": list(session.operative.inventory),
+                "observation": observation,
+                "llm_raw_response": llm_raw,
+                "think_error": think_error,
+                "parse_error": parse_error,
+                "action": action_str,
+                "result": result.message,
+                "success": result.success,
+            }
+            session.game_log.append(log_entry)
+
+            # 6. Send turn update (include debug info for frontend)
             state_dict = game_state_to_dict(
                 session.operative, session.world, session.turn, session.max_turns
             )
             event = turn_event_to_dict(session.turn, action_str, result.message, scan_result, state_dict)
+            # Attach debug info so the UI can display it
+            if think_error:
+                event["think_error"] = think_error
+            if parse_error:
+                event["parse_error"] = parse_error
+            if llm_raw:
+                event["llm_raw"] = llm_raw[:500]
             await ws.send_json(event)
 
-            # 6. Animation delay
+            # 7. Animation delay
             await asyncio.sleep(0.8)
 
-        # 7. Check end conditions and send game_over
+        # 8. Check end conditions and send game_over
         await check_game_over(ws, session)
 
     except asyncio.CancelledError:
         pass
     except Exception as e:
-        logger.error(f"Auto loop error: {e}")
+        logger.error(f"Auto loop error: {e}", exc_info=True)
         try:
             await ws.send_json({"type": "error", "message": f"Auto mode error: {e}"})
         except Exception:
@@ -449,6 +537,7 @@ async def handle_reset(ws: WebSocket, session: GameSession):
     session.tools = tools
     session.turn = 0
     session.history = []
+    session.game_log = []
 
     state_dict = game_state_to_dict(operative, world, 0, session.max_turns)
     event = turn_event_to_dict(0, "", MICRO_MISSION_BRIEFING, "", state_dict)
@@ -476,6 +565,18 @@ async def check_game_over(ws: WebSocket, session: GameSession):
         won = False
     else:
         return  # game still going
+
+    # Append game-over entry to log
+    session.game_log.append({
+        "turn": session.turn,
+        "event": "GAME_OVER",
+        "reason": reason,
+        "won": won,
+        "position": list(op.position),
+        "health": op.health,
+        "dossiers": op.dossiers,
+        "inventory": list(op.inventory),
+    })
 
     await ws.send_json({
         "type": "game_over",
