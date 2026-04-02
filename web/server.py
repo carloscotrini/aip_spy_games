@@ -604,5 +604,25 @@ app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    import signal
+    import subprocess
     import uvicorn
-    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
+
+    PORT = 8000
+
+    # Kill any orphaned process still holding the port (common after unclean shutdown)
+    try:
+        result = subprocess.run(
+            ["lsof", "-ti", f"tcp:{PORT}"],
+            capture_output=True, text=True,
+        )
+        pids = result.stdout.strip().split()
+        my_pid = str(os.getpid())
+        for pid in pids:
+            if pid and pid != my_pid:
+                logger.info(f"Killing orphaned process {pid} on port {PORT}")
+                os.kill(int(pid), signal.SIGTERM)
+    except Exception:
+        pass  # lsof not available or no process found — fine
+
+    uvicorn.run("server:app", host="0.0.0.0", port=PORT, reload=True)
