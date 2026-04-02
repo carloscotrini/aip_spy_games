@@ -588,44 +588,45 @@ body {
   color: var(--red, #ff4444);
 }
 
-/* 10. Game Over
+/* 10. Game Over (inline panel, non-blocking)
    ------------------------------------------------------------ */
 .game-over-overlay {
   display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(4px);
-  z-index: 5000;
-  justify-content: center;
-  align-items: center;
+  background: var(--panel-bg);
+  border: 2px solid var(--panel-border);
+  padding: 16px 24px;
+  text-align: center;
+  animation: fadeIn 300ms ease-out;
 }
 
-.game-over-overlay.active {
-  display: flex;
+.game-over-overlay.game-over--visible {
+  display: block;
 }
 
 .game-over-box {
-  background: var(--panel-bg);
-  border: 2px solid var(--panel-border);
-  padding: 32px;
-  text-align: center;
-  max-width: 400px;
-  width: 90%;
+  max-width: 100%;
 }
 
 .game-over-box h2 {
   font-size: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
+}
+
+.game-over-box p {
+  margin: 0 0 8px;
 }
 
 .game-over-box .stats {
   font-size: 12px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   line-height: 1.8;
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
-.game-over--victory .game-over-box {
+.game-over--victory {
   border-color: var(--green);
   box-shadow: 0 0 20px var(--green), 0 0 40px rgba(0, 255, 65, 0.2);
 }
@@ -635,7 +636,7 @@ body {
   text-shadow: 0 0 10px var(--green);
 }
 
-.game-over--defeat .game-over-box {
+.game-over--defeat {
   border-color: var(--red);
   box-shadow: 0 0 20px var(--red), 0 0 40px rgba(255, 34, 34, 0.2);
 }
@@ -645,7 +646,7 @@ body {
   text-shadow: 0 0 10px var(--red);
 }
 
-.game-over--timeout .game-over-box {
+.game-over--timeout {
   border-color: var(--amber);
   box-shadow: 0 0 20px var(--amber), 0 0 40px rgba(255, 140, 0, 0.2);
 }
