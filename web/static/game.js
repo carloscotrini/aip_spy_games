@@ -330,8 +330,7 @@
       overlay.removeChild(overlay.firstChild);
     }
 
-    overlay.style.display = "flex";
-    overlay.className = "game-over-overlay";
+    overlay.className = "game-over-overlay game-over--visible";
 
     // Determine outcome class
     if (data.won) {
@@ -383,12 +382,9 @@
     btn.className = "btn btn--primary";
     btn.textContent = "Play Again";
     btn.addEventListener("click", function () {
-      overlay.style.display = "none";
+      overlay.classList.remove("game-over--visible");
       if (window.GameControls && window.GameControls.resetGame) {
         window.GameControls.resetGame();
-      } else {
-        // Fallback: send reset via WebSocket if GameControls not yet loaded
-        overlay.style.display = "none";
       }
     });
     panel.appendChild(btn);
@@ -593,9 +589,9 @@ const GameControls = (function () {
     }
     gameOver = false;
     autoRunning = false;
-    // Hide game over overlay
+    // Hide game over panel
     const overlay = document.getElementById("game-over-overlay");
-    if (overlay) overlay.style.display = "none";
+    if (overlay) overlay.classList.remove("game-over--visible");
     updateControlState();
   }
 
