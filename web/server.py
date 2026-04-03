@@ -656,4 +656,9 @@ if __name__ == "__main__":
     except Exception:
         pass  # lsof not available or no process found — fine
 
-    uvicorn.run("server:app", host="0.0.0.0", port=PORT, reload=True)
+    # Watch both web/ and agentic_ai_spy/ so code changes auto-reload
+    extra_watch = os.path.join(os.path.dirname(__file__), "..", "agentic_ai_spy")
+    uvicorn.run(
+        "server:app", host="0.0.0.0", port=PORT,
+        reload=True, reload_dirs=[".", extra_watch],
+    )
