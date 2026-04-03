@@ -967,10 +967,16 @@ const GameControls = (function () {
           type: "turn_update",
           turn: 0,
           action: "",
-          result: resp.mission_briefing,
+          result: "Welcome, Agent Lambda.",
           scan: "",
           state: resp.state,
         });
+        // Set narrative intro for the narrator panel
+        GameRenderer.renderNarrator(
+          "You wade ashore on a fog-shrouded island. " +
+          "Somewhere in this jungle outpost, three classified dossiers await. " +
+          "The air smells of salt and secrets. Your mission begins now."
+        );
 
         // Show dismissible mission briefing panel
         showMissionBriefing();
