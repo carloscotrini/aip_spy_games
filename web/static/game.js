@@ -875,7 +875,12 @@ const GameControls = (function () {
   function restoreEditor() {
     const savedPrompt = localStorage.getItem("spy_system_prompt");
     const sysPromptEl = document.getElementById("system-prompt");
-    if (savedPrompt && sysPromptEl) sysPromptEl.value = savedPrompt;
+    // Clear stale cached prompt from older version (contained fabricate)
+    if (savedPrompt && savedPrompt.indexOf("fabricate") !== -1) {
+      localStorage.removeItem("spy_system_prompt");
+    } else if (savedPrompt && sysPromptEl) {
+      sysPromptEl.value = savedPrompt;
+    }
 
     // Restore saved API key and check status
     const savedKey = localStorage.getItem("spy_gemini_key");
