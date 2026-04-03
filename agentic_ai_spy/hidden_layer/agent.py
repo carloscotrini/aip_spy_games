@@ -107,11 +107,20 @@ def parse_tool_call(text: str) -> tuple[str, dict]:
     # Try to find TOOL: pattern
     match = re.search(r'TOOL:\s*(\w+)\((.*?)\)', text, re.DOTALL)
     if not match:
-        # Fallback: look for just a tool name
+        # Fallback: look for just a tool name with TOOL: prefix
         simple = re.search(r'TOOL:\s*(\w+)', text)
         if simple:
             return simple.group(1), {}
-        raise ValueError(f"No TOOL: call found in LLM response. Got: {text[:300]!r}")
+        # Fallback: accept bare tool calls without TOOL: prefix
+        # e.g. move(direction="east") or collect()
+        bare = re.search(r'\b(move|talk|collect|fabricate|scan)\((.*?)\)', text, re.DOTALL)
+        if bare:
+            match = bare  # reuse the parsing logic below
+        else:
+            bare_simple = re.search(r'\b(move|talk|collect|fabricate|scan)\b', text)
+            if bare_simple:
+                return bare_simple.group(1), {}
+            raise ValueError(f"No TOOL: call found in LLM response. Got: {text[:300]!r}")
 
     tool_name = match.group(1)
     args_str = match.group(2).strip()
