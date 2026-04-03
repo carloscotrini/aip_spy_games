@@ -142,6 +142,7 @@ body {
   gap: 12px;
   flex-shrink: 0;
   min-width: 0;
+  max-width: 520px;
 }
 
 /* Action log takes remaining space on the right */
@@ -372,7 +373,6 @@ body {
 /* 7. Action Log
    ------------------------------------------------------------ */
 .action-log {
-  max-height: 200px;
   overflow-y: auto;
   scroll-snap-type: y proximity;
   background: var(--panel-bg);
