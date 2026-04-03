@@ -26,108 +26,116 @@
     </nav>
   </header>
 
-  <!-- Game Area: Map + Stats -->
-  <section id="game-area" class="game-area">
-    <div id="game-map" class="game-grid"></div>
+  <!-- Main Layout: Game + Action Log side by side -->
+  <div class="main-layout">
 
-    <div id="stats-panel" class="stats-panel">
-      <div id="turn-bar" class="turn-bar">
-        <div class="turn-bar__fill"></div>
-        <span class="turn-bar__text"></span>
-      </div>
+    <!-- Left Column: Game + Controls -->
+    <div class="left-column">
 
-      <div id="health-bar" class="health-bar"></div>
+      <!-- Game Area: Map + Stats -->
+      <section id="game-area" class="game-area">
+        <div id="game-map" class="game-grid"></div>
 
-      <div id="dossier-bar" class="dossier-bar">
-        <div class="dossier-bar__fill"></div>
-        <span class="dossier-bar__text"></span>
-      </div>
+        <div id="stats-panel" class="stats-panel">
+          <div id="turn-bar" class="turn-bar">
+            <div class="turn-bar__fill"></div>
+            <span class="turn-bar__text"></span>
+          </div>
 
-      <div id="inventory" class="inventory">
-        <span class="bar-label">Inventory</span>
-        <div class="inventory-items"></div>
-      </div>
+          <div id="health-bar" class="health-bar"></div>
 
-      <div id="scan-panel" class="scan-panel">
-        <span class="bar-label">&#x1F4E1; Scan</span>
-        <pre class="scan-text"></pre>
-      </div>
-    </div>
-  </section>
+          <div id="dossier-bar" class="dossier-bar">
+            <div class="dossier-bar__fill"></div>
+            <span class="dossier-bar__text"></span>
+          </div>
 
-  <!-- Controls Area -->
-  <section id="controls-area" class="controls-area">
-    <div class="controls-row">
-      <!-- D-Pad -->
-      <div class="dpad">
-        <div></div>
-        <button id="dpad-north" class="btn btn--primary" tabindex="1">&uarr;</button>
-        <div></div>
-        <button id="dpad-west" class="btn btn--primary" tabindex="2">&larr;</button>
-        <div class="dpad-center"></div>
-        <button id="dpad-east" class="btn btn--primary" tabindex="3">&rarr;</button>
-        <div></div>
-        <button id="dpad-south" class="btn btn--primary" tabindex="4">&darr;</button>
-        <div></div>
-      </div>
+          <div id="inventory" class="inventory">
+            <span class="bar-label">Inventory</span>
+            <div class="inventory-items"></div>
+          </div>
 
-      <!-- Action buttons -->
-      <div class="action-controls">
-        <button id="btn-collect" class="btn btn--success" tabindex="5">&#x270B; Collect</button>
+          <div id="narrator-panel" class="narrator-panel">
+            <span class="bar-label">&#x1F4D6; Narrator</span>
+            <div class="narrator-text"></div>
+          </div>
+        </div>
+      </section>
 
-        <div class="input-group">
-          <input type="text" id="talk-input" class="input-field" placeholder="Message..." tabindex="6">
-          <button id="talk-send" class="btn btn--primary" tabindex="7">&#x1F4AC; Send</button>
+      <!-- Controls Area -->
+      <section id="controls-area" class="controls-area">
+        <div class="controls-row">
+          <!-- D-Pad -->
+          <div class="dpad">
+            <div></div>
+            <button id="dpad-north" class="btn btn--primary" tabindex="1">&uarr;</button>
+            <div></div>
+            <button id="dpad-west" class="btn btn--primary" tabindex="2">&larr;</button>
+            <div class="dpad-center"></div>
+            <button id="dpad-east" class="btn btn--primary" tabindex="3">&rarr;</button>
+            <div></div>
+            <button id="dpad-south" class="btn btn--primary" tabindex="4">&darr;</button>
+            <div></div>
+          </div>
+
+          <!-- Action buttons -->
+          <div class="action-controls">
+            <button id="btn-collect" class="btn btn--success" tabindex="5">&#x270B; Collect</button>
+
+            <div class="input-group">
+              <input type="text" id="talk-input" class="input-field" placeholder="Message..." tabindex="6">
+              <button id="talk-send" class="btn btn--primary" tabindex="7">&#x1F4AC; Send</button>
+            </div>
+
+            <div class="auto-controls">
+              <button id="btn-run" class="btn btn--success">&#x25B6; Run Agent</button>
+              <button id="btn-stop" class="btn btn--danger">&#x23F9; Stop</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- System Prompt Editor -->
+      <section id="editor-area" class="editor-panel">
+        <div class="editor-header">
+          <span>&#x1F4DD; SYSTEM PROMPT</span>
+          <button id="editor-toggle" class="btn">&#x25BC; collapse</button>
         </div>
 
-        <div class="input-group">
-          <input type="text" id="fabricate-input" class="input-field" placeholder="Item name..." tabindex="8">
-          <button id="fabricate-send" class="btn btn--primary" tabindex="9">&#x1F527; Build</button>
+        <div class="api-key-row">
+          <label for="api-key">&#x1F511; Gemini API Key:</label>
+          <div class="input-group">
+            <input type="password" id="api-key" class="input-field" placeholder="Paste your GEMINI_API_KEY here...">
+            <button id="btn-save-key" class="btn btn--primary">Save</button>
+          </div>
+          <span id="api-key-status" class="api-key-status"></span>
         </div>
 
-        <div class="auto-controls">
-          <button id="btn-run" class="btn btn--success">&#x25B6; Run Agent</button>
-          <button id="btn-stop" class="btn btn--danger">&#x23F9; Stop</button>
-        </div>
-      </div>
-    </div>
-  </section>
+        <label for="system-prompt">Tell the LLM who it is, what tools it has, and how to respond:</label>
+        <textarea id="system-prompt" class="prompt-textarea" rows="12">You are a spy. Collect 3 classified dossiers within 30 turns.
 
-  <!-- System Prompt Editor -->
-  <section id="editor-area" class="editor-panel">
-    <div class="editor-header">
-      <span>&#x1F4DD; SYSTEM PROMPT</span>
-      <button id="editor-toggle" class="btn">&#x25BC; collapse</button>
-    </div>
+On the island there are dossier caches. Use collect() to grab them.
+Throughout the grid you can use collect() to grab items.
+Talk to informants and ask about "jobs" or "deliveries" to get quest items. If you have an item to deliver, mention it by name.
 
-    <div class="api-key-row">
-      <label for="api-key">&#x1F511; Gemini API Key:</label>
-      <div class="input-group">
-        <input type="password" id="api-key" class="input-field" placeholder="Paste your GEMINI_API_KEY here...">
-        <button id="btn-save-key" class="btn btn--primary">Save</button>
-      </div>
-      <span id="api-key-status" class="api-key-status"></span>
-    </div>
-
-    <label for="system-prompt">Tell the LLM who it is, what tools it has, and how to respond:</label>
-    <textarea id="system-prompt" class="prompt-textarea" rows="12">You are a spy. Collect 3 dossiers on a 3x3 grid in 30 turns.
-
-Talk to every informant you meet. Ask about "jobs". If you have an item to deliver, say its name. Use collect() on caches. Explore every cell.
-
-Tools (respond with exactly one per turn):
+Available tools (use exactly one per turn):
 TOOL: move(direction="north|south|east|west")
 TOOL: talk(message="your message")
 TOOL: collect()
-TOOL: fabricate(item="item name")</textarea>
-  </section>
 
-  <!-- Game Over Panel (inline, non-blocking) -->
-  <div id="game-over-overlay" class="game-over-overlay"></div>
+Respond with exactly one TOOL: line, no other text.</textarea>
+      </section>
 
-  <!-- Action Log -->
-  <section id="action-log" class="action-log">
-    <div class="log-header">Action Log</div>
-  </section>
+      <!-- Game Over Panel (inline, non-blocking) -->
+      <div id="game-over-overlay" class="game-over-overlay"></div>
+
+    </div>
+
+    <!-- Right Column: Action Log -->
+    <section id="action-log" class="action-log">
+      <div class="log-header">Action Log</div>
+    </section>
+
+  </div><!-- .main-layout -->
 
   <footer class="footer">BMAI FS26 &mdash; ETH Z&uuml;rich</footer>
 

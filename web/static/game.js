@@ -34,7 +34,6 @@
     move: "\u{1F9ED}",
     talk: "\u{1F4AC}",
     collect: "\u270B",
-    fabricate: "\u{1F527}",
   };
 
   // Success/damage keyword patterns
@@ -269,7 +268,7 @@
       entry.appendChild(actionSpan);
     }
 
-    // NPC portrait if talking to an NPC
+    // NPC/robot portrait
     if (portraitKey && NPC_PORTRAITS[portraitKey]) {
       const img = document.createElement("img");
       img.className = "log-portrait";
@@ -308,15 +307,13 @@
     container.scrollTop = container.scrollHeight;
   }
 
-  // ---- 7. renderScan(scanText) ----
-  function renderScan(scanText) {
-    const container = document.getElementById("scan-panel");
+  // ---- 7. renderNarrator(resultText) ----
+  function renderNarrator(resultText) {
+    const container = document.getElementById("narrator-panel");
     if (!container) return;
-    const pre = container.querySelector(".scan-text");
-    if (pre) {
-      pre.textContent = scanText || "";
-    } else {
-      container.textContent = scanText || "";
+    const div = container.querySelector(".narrator-text");
+    if (div) {
+      div.textContent = resultText || "";
     }
   }
 
@@ -423,18 +420,27 @@
     overlay.appendChild(panel);
   }
 
-  // Helper: detect NPC portrait key from talk action and current cell
-  function detectPortraitKey(state, action) {
-    if (!action || !action.startsWith("talk")) return null;
+  // Helper: detect NPC/robot portrait key from action, result, and current cell
+  function detectPortraitKey(state, action, result) {
     if (!state || !state.grid || !state.position) return null;
-    var r = state.position[0], c = state.position[1];
-    var cell = state.grid[r] && state.grid[r][c];
-    if (!cell || !cell.npc_name) return null;
-    // Map NPC names to portrait keys
-    var name = cell.npc_name.toLowerCase();
-    if (name.indexOf("vapnik") !== -1) return "dr_vapnik";
-    if (name.indexOf("dropout") !== -1) return "dropout";
-    if (name.indexOf("cryo") !== -1) return "cryo_sentinel";
+
+    // For talk actions: show the NPC at current cell
+    if (action && action.startsWith("talk")) {
+      var r = state.position[0], c = state.position[1];
+      var cell = state.grid[r] && state.grid[r][c];
+      if (!cell || !cell.npc_name) return null;
+      var name = cell.npc_name.toLowerCase();
+      if (name.indexOf("vapnik") !== -1) return "dr_vapnik";
+      if (name.indexOf("dropout") !== -1) return "dropout";
+      if (name.indexOf("cryo") !== -1) return "cryo_sentinel";
+      return null;
+    }
+
+    // For move actions: show robot portrait if result mentions Cryo-Sentinel
+    if (action && action.startsWith("move") && result) {
+      if (/cryo.sentinel/i.test(result)) return "cryo_sentinel";
+    }
+
     return null;
   }
 
@@ -478,7 +484,7 @@
           renderTurnBar(message.state);
           renderInventory(message.state);
         }
-        var portrait = detectPortraitKey(message.state, message.action);
+        var portrait = detectPortraitKey(message.state, message.action, message.result);
         renderActionLog(message.action, message.result, portrait);
         // Show LLM debug info if there were errors
         if (message.think_error) {
@@ -490,7 +496,8 @@
         if (message.llm_raw && (message.think_error || message.parse_error || (message.action && message.action.startsWith("scan")))) {
           renderActionLog("", "\u{1F916} LLM raw: " + message.llm_raw);
         }
-        renderScan(message.scan);
+        // Narrator shows the result of the last action
+        renderNarrator(message.result);
         // Show spinner if auto mode is running (next turn coming)
         if (window._autoRunning && message.state && message.state.is_alive && !message.state.has_won) {
           showSpinner();
@@ -538,7 +545,7 @@
     renderTurnBar: renderTurnBar,
     renderInventory: renderInventory,
     renderActionLog: renderActionLog,
-    renderScan: renderScan,
+    renderNarrator: renderNarrator,
   };
 })();
 
@@ -658,11 +665,6 @@ const GameControls = (function () {
     const talkInput = document.getElementById("talk-input");
     if (talkInput) talkInput.disabled = disabled;
 
-    const fabSend = document.getElementById("fabricate-send");
-    if (fabSend) fabSend.disabled = disabled;
-    const fabInput = document.getElementById("fabricate-input");
-    if (fabInput) fabInput.disabled = disabled;
-
     // Auto mode buttons
     const btnRun = document.getElementById("btn-run");
     if (btnRun) btnRun.disabled = mode !== "auto" || autoRunning || gameOver;
@@ -737,20 +739,6 @@ const GameControls = (function () {
     if (talkSend) talkSend.addEventListener("click", doTalk);
     if (talkInput) talkInput.addEventListener("keydown", function (e) {
       if (e.key === "Enter") { e.preventDefault(); doTalk(); }
-    });
-
-    // Fabricate
-    const fabInput = document.getElementById("fabricate-input");
-    const fabSend = document.getElementById("fabricate-send");
-    function doFabricate() {
-      const val = fabInput ? fabInput.value.trim() : "";
-      if (!val) return;
-      sendAction("fabricate", { item: val });
-      if (fabInput) fabInput.value = "";
-    }
-    if (fabSend) fabSend.addEventListener("click", doFabricate);
-    if (fabInput) fabInput.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") { e.preventDefault(); doFabricate(); }
     });
 
     // Mode switching

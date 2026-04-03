@@ -168,28 +168,18 @@ class MicroGameTools(GameTools):
 # Micro mission briefing
 # ---------------------------------------------------------------------------
 
-MICRO_MISSION_BRIEFING = """CLASSIFIED \u2014 MICRO MISSION BRIEFING \u2014 AGENT LAMBDA
+MICRO_MISSION_BRIEFING = """Collect 3 classified dossiers within 30 turns.
 
-OBJECTIVE: Extract 3 classified dossiers from a tiny OVERFIT outpost (3x3 grid).
+On the island there are dossier caches. Use collect() to grab them.
+Throughout the grid you can use collect() to grab items.
+Talk to informants and ask about "jobs" or "deliveries" to get quest items. If you have an item to deliver, mention it by name.
 
-THE BASE:
-- Dossier caches (\U0001f4c1): Use collect() to grab them. Worth 1 dossier each.
-- Jungle (\U0001f334): May contain useful items. Use collect() to search.
-- Informants (\U0001f575\ufe0f): Talk using talk(). Ask about "jobs" or "deliveries" to get
-  quest items. If you have an item to deliver, mention it by name.
-- Robot (\U0001f916): Move into it with the correct weapon to destroy it (+1 dossier).
-  Moving in WITHOUT the weapon deals 1 damage and bounces you back.
+Available tools (use exactly one per turn):
+TOOL: move(direction="north|south|east|west")
+TOOL: talk(message="your message")
+TOOL: collect()
 
-HOW TO EARN DOSSIERS:
-1. Collect the dossier cache (1 dossier)
-2. Complete the delivery errand (1 dossier) \u2014 ask informants about "jobs"
-3. Destroy the robot by moving into it with the right weapon (1 dossier)
-
-KEY TACTICS:
-- Talk to EVERY informant. They tell you exactly what to do.
-- When told to deliver something, go to the destination and mention the item.
-- When told about a weapon location, go get it, then move into the robot cell.
-- Don't revisit cells you've already collected from.
+Respond with exactly one TOOL: line, no other text.
 """
 
 
