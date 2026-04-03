@@ -122,11 +122,37 @@ body {
 /* 4. Layout
    ------------------------------------------------------------ */
 .app-container {
-  max-width: 700px;
+  max-width: 1100px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+/* Side-by-side layout: game on left, action log on right */
+.main-layout {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.left-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex-shrink: 0;
+  min-width: 0;
+  max-width: 520px;
+}
+
+/* Action log takes remaining space on the right */
+.main-layout > .action-log {
+  flex: 1;
+  min-width: 250px;
+  max-height: 80vh;
+  height: auto;
+  min-height: 400px;
+  align-self: stretch;
 }
 
 .title-bar {
@@ -326,20 +352,27 @@ body {
   font-size: 11px;
 }
 
-/* Scan panel */
-.scan-panel {
-  background: var(--panel-bg);
+/* Narrator panel (replaces scan panel) */
+.narrator-panel {
+  background: rgba(0, 255, 65, 0.03);
   border: 1px solid var(--panel-border);
   padding: 8px;
-  font-size: 11px;
-  white-space: pre-wrap;
-  line-height: 1.4;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.narrator-text {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--green);
+  font-style: italic;
+  min-height: 2em;
 }
 
 /* 7. Action Log
    ------------------------------------------------------------ */
 .action-log {
-  max-height: 200px;
   overflow-y: auto;
   scroll-snap-type: y proximity;
   background: var(--panel-bg);
@@ -658,7 +691,17 @@ body {
 
 /* 11. Responsive
    ------------------------------------------------------------ */
-@media (max-width: 600px) {
+@media (max-width: 800px) {
+  .main-layout {
+    flex-direction: column;
+  }
+
+  .main-layout > .action-log {
+    max-height: 200px;
+    min-height: auto;
+    min-width: auto;
+  }
+
   :root {
     --cell-size: 48px;
   }
@@ -710,18 +753,18 @@ body {
 }
 
 .spinner::after {
-  content: '⠋';
+  content: '\2819';
   animation: spin 0.8s steps(6) infinite;
 }
 
 @keyframes spin {
-  0%   { content: '⠋'; }
-  16%  { content: '⠙'; }
-  33%  { content: '⠹'; }
-  50%  { content: '⠸'; }
-  66%  { content: '⠼'; }
-  83%  { content: '⠴'; }
-  100% { content: '⠋'; }
+  0%   { content: '\280B'; }
+  16%  { content: '\2819'; }
+  33%  { content: '\2839'; }
+  50%  { content: '\2838'; }
+  66%  { content: '\283C'; }
+  83%  { content: '\2834'; }
+  100% { content: '\280B'; }
 }
 
 /* Scrollbar styling */
@@ -799,8 +842,8 @@ body {
 /* NPC portrait in action log */
 .log-portrait {
   display: block;
-  width: 48px;
-  height: 48px;
+  width: 64px;
+  height: 64px;
   object-fit: cover;
   border: 1px solid var(--panel-border);
   border-radius: 2px;
@@ -813,15 +856,6 @@ body {
   border: 1px solid var(--green);
   padding: 8px;
   margin-bottom: 4px;
-}
-
-/* Scan text */
-.scan-text {
-  margin: 0;
-  font-family: var(--font-body);
-  font-size: 11px;
-  white-space: pre-wrap;
-  color: var(--green);
 }
 
 /* Footer */

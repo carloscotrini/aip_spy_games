@@ -113,11 +113,11 @@ def parse_tool_call(text: str) -> tuple[str, dict]:
             return simple.group(1), {}
         # Fallback: accept bare tool calls without TOOL: prefix
         # e.g. move(direction="east") or collect()
-        bare = re.search(r'\b(move|talk|collect|fabricate|scan)\((.*?)\)', text, re.DOTALL)
+        bare = re.search(r'\b(move|talk|collect|scan)\((.*?)\)', text, re.DOTALL)
         if bare:
             match = bare  # reuse the parsing logic below
         else:
-            bare_simple = re.search(r'\b(move|talk|collect|fabricate|scan)\b', text)
+            bare_simple = re.search(r'\b(move|talk|collect|scan)\b', text)
             if bare_simple:
                 return bare_simple.group(1), {}
             raise ValueError(f"No TOOL: call found in LLM response. Got: {text[:300]!r}")
