@@ -450,7 +450,38 @@ async def run_auto_loop(ws: WebSocket, session: GameSession, think_fn):
                 await asyncio.sleep(1.0)
                 continue
 
-            result = session.tools.execute(tool_name, args)
+            try:
+                result = session.tools.execute(tool_name, args)
+            except Exception as e:
+                logger.warning(f"Tool execution error (turn {session.turn}): {e}")
+                think_error = f"Tool execution error: {e}"
+                consecutive_errors += 1
+                session.game_log.append({
+                    "turn": session.turn,
+                    "position": list(session.operative.position),
+                    "health": session.operative.health,
+                    "dossiers": session.operative.dossiers,
+                    "inventory": list(session.operative.inventory),
+                    "observation": observation,
+                    "llm_raw_response": llm_raw,
+                    "think_error": think_error,
+                    "parse_error": None,
+                    "action": f"{tool_name}({args})" if args else f"{tool_name}()",
+                    "result": None,
+                    "success": False,
+                })
+                await ws.send_json({
+                    "type": "error",
+                    "message": f"[Turn {session.turn + 1}] {think_error}",
+                })
+                if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                    await ws.send_json({
+                        "type": "error",
+                        "message": f"Stopped: {consecutive_errors} consecutive errors. Check your API key and system prompt.",
+                    })
+                    break
+                await asyncio.sleep(1.0)
+                continue
             session.turn += 1
 
             # Update history

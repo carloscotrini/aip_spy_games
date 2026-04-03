@@ -20,12 +20,16 @@ def gemini_call_with_retry(client, max_retries: int = 3, **kwargs):
     Retries on transient errors (rate limits, server errors).
     Returns the response object, or raises after exhausting retries.
     """
-    from google.api_core.exceptions import ResourceExhausted, ServiceUnavailable
+    try:
+        from google.api_core.exceptions import ResourceExhausted, ServiceUnavailable
+        _retryable = (ResourceExhausted, ServiceUnavailable)
+    except ImportError:
+        _retryable = ()
     delay = 2.0
     for attempt in range(max_retries):
         try:
             return client.models.generate_content(**kwargs)
-        except (ResourceExhausted, ServiceUnavailable) as e:
+        except _retryable as e:
             if attempt == max_retries - 1:
                 raise
             time.sleep(delay)
