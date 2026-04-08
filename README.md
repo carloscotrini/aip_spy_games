@@ -1,58 +1,45 @@
-# aip_spy_games
+# The Support Layer
 
-## Quick Start — Web App (Micro Mission)
+An educational game where you play as an LLM agent staffing a customer support desk. Resolve tickets, search knowledge bases, consult coworkers, and handle adversarial customers — all while managing your context budget and earning CSAT stars.
 
-### 1. Create a virtual environment
+Built as a teaching tool for AI agent concepts: RAG, tool use, multi-agent orchestration, prompt injection defense, and human-in-the-loop escalation.
 
-```bash
-cd web
-python -m venv .venv
-```
-
-### 2. Activate the virtual environment
-
-macOS / Linux:
-```bash
-source .venv/bin/activate
-```
-
-Windows:
-```bash
-.venv\Scripts\activate
-```
-
-### 3. Install dependencies
+## Quick Start
 
 ```bash
-pip install -r requirements.txt
+# Install dependencies
+pip install -r web/requirements.txt
+
+# Run the web server
+cd web && python server.py
+# → http://localhost:8000
+
+# Run tests
+pytest tests/
 ```
 
-### 4. Launch the server
+## Game Concept
 
-```bash
-python server.py
-```
+- **Unified inbox** with tickets of varying priority, topic, and difficulty
+- **Manual mode**: You pick actions — open tickets, search KB, craft responses
+- **Auto mode**: An LLM agent (Gemini) autonomously resolves tickets
+- **Win condition**: Earn 3 CSAT stars (micro shift) before running out of turns or context budget
 
-Open http://localhost:8000 in your browser.
+## KPI Mapping
 
-### 5. Set up the Gemini API key
+| Real Support Desk | Game Mechanic |
+|---|---|
+| Customer Satisfaction | CSAT Stars (win condition) |
+| Context window / hallucination risk | Context Budget (health) |
+| Knowledge base (RAG) | Searchable KB articles → Snippets |
+| Escalation to human | `escalate()` action |
+| Prompt injection / social engineering | Adversarial tickets |
+| Canned responses / tools | Macros (password_reset, refund) |
+| SLA timers | Patience countdown per ticket |
+| Triage / routing | Coworker consultation |
 
-You can provide the API key in two ways:
+## Requirements
 
-- **From the web UI** (recommended): Paste your key into the "Gemini API Key" field in the System Prompt panel and click **Save**. The key is stored in your browser and re-sent automatically on reload.
-- **From the terminal** (before launching): `export GEMINI_API_KEY=your-key` (macOS/Linux) or `set GEMINI_API_KEY=your-key` (Windows).
-
-Without a Gemini API key, manual mode works with keyword-matched NPC responses. Auto mode requires the key for LLM calls.
-
-## Jupyter Notebooks
-
-The notebooks are in `agentic_ai_spy/`. To run them locally:
-
-```bash
-cd agentic_ai_spy
-python -m venv .venv
-source .venv/bin/activate   # macOS/Linux
-pip install -r requirements.txt
-pip install jupyter
-jupyter notebook
-```
+- Python 3.11+
+- FastAPI, uvicorn, websockets
+- (Optional) `google-genai` for Gemini-powered auto mode and LLM oracle

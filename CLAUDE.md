@@ -1,80 +1,75 @@
-# The Hidden Layer — Agentic AI Spy Game
+# The Support Layer — LLM Customer Support Desk Game
 
-Educational spy-themed game for teaching AI agents and LLM-powered decision-making (BMAI FS26 at ETH Zurich).
-Current focus: **Micro Mission** (3x3 grid, web-based).
+Educational support-desk-themed game for teaching AI agent concepts and LLM-powered decision-making.
+Current focus: **Micro Shift** (4 tickets, 30 turns, web-based).
 
 ## Architecture
 
 ```
-aip_spy_games/
-├── agentic_ai_spy/
-│   ├── hidden_layer/           # Core game engine (pure Python, no DB)
-│   │   ├── operative.py        # Player state: health, dossiers, inventory, position, visited, journal
-│   │   ├── game_world.py       # World grid, cells, NPCs, items, quest flags, CellType enum
-│   │   ├── micro_mission.py    # Micro mission config: 3x3 grid, MicroGameWorld, MicroGameTools
-│   │   ├── tools.py            # Game actions: move, talk, collect, fabricate
-│   │   ├── oracle.py           # NPC dialogue: stub oracle + Gemini LLM oracle
+aip_llm_support_desk_game/
+├── support_desk_game/
+│   ├── core/
+│   │   ├── support_agent.py    # Player state: context_budget, csat_stars, snippets, shift_log
+│   │   ├── support_desk.py     # Desk world: tickets, KB, coworkers, macros, catalogs
+│   │   ├── micro_shift.py      # Micro shift config: 4 tickets, 30 turns, WIN_CSAT=3
+│   │   ├── tools.py            # Game actions: open_ticket, read, search_kb, consult, respond, etc.
+│   │   ├── oracle.py           # Response quality judge: stub oracle + Gemini LLM oracle
 │   │   ├── agent.py            # Agent loop, think_llm interface, parse_tool_call
-│   │   ├── serialization.py    # JSON serialization for web frontend (fog-of-war)
-│   │   ├── display.py          # Terminal display
-│   │   └── interactive.py, main.py
-│   ├── *.ipynb                 # Jupyter notebooks (micro/training/full missions)
-│   └── assets/                 # NPC portraits
+│   │   ├── serialization.py    # JSON serialization for web frontend (fog-of-war on unread tickets)
+│   │   └── display.py          # Terminal display
+│   └── __init__.py
 ├── web/
 │   ├── server.py               # FastAPI + WebSocket backend, session management, agent loop
 │   ├── requirements.txt        # FastAPI, uvicorn, websockets, google-genai
 │   └── static/
 │       ├── index.html          # HTML skeleton
-│       ├── game.js             # Renderer, controls, WebSocket client, localStorage
-│       ├── style.css           # CRT terminal theme
-│       └── assets/             # NPC portraits
+│       ├── game.js             # Renderer, controls, WebSocket client
+│       └── style.css           # CRT terminal theme
 ├── tests/
-│   └── test_serialization.py   # pytest unit tests
-├── WORKFORCE_PLAN.md           # 7-issue development spec with dependency tiers
+│   └── test_serialization.py   # pytest unit tests (agent, desk, tools, serialization)
+├── CLAUDE.md
 └── README.md
 ```
 
 ## Data Model (all in-memory, no database)
 
-### Operative (player state) — `operative.py`
-- `health: int` (0–3), `dossiers: int`, `inventory: list[str]`
-- `position: tuple[int, int]`, `visited: set[tuple[int, int]]`
-- `journal: list[str]` (action log)
-- Win condition: `dossiers >= WIN_DOSSIERS` (10 full, 3 micro)
+### SupportAgent (player state) — `support_agent.py`
+- `context_budget: int` (0–3, health equivalent), `csat_stars: int` (dossier equivalent)
+- `snippets: list[str]` (inventory — KB articles collected)
+- `current_ticket_id: str | None`, `resolved_tickets`, `escalated_tickets`
+- `shift_log: list[str]` (action log)
+- Win condition: `csat_stars >= WIN_CSAT` (3 micro)
 
-### GameWorld — `game_world.py`
-- `grid: list[list[Cell]]` — each Cell has: `cell_type` (CellType enum), `items`, `npc_id`, `robot_name`, `trap`, `description`
-- CellType enum: OPEN, JUNGLE, WALL, CACHE, INFORMANT, FORGE, LAB, SAFEHOUSE, ROBOT, HELICOPTER
-- Quest flags: `usb_drive_picked_up/delivered`, `microfilm_picked_up/delivered`, `codebook_picked_up/delivered`, `hard_drive_traded`, `medical_supplies_delivered`, `virus_code_received`, `cryo_sentinel_alive`, `evil_ai_robot_alive`
-- NPC_CATALOG: `dr_vapnik`, `backprop`, `dropout` — each with personality, knowledge, style, greeting
-- ITEM_CATALOG: quest items (USB Drive, Microfilm, Fuel Canister, etc.) + weapons (Flamethrower, Computer Virus)
+### SupportDesk (game world) — `support_desk.py`
+- `inbox: list[Ticket]` — unified ticket queue
+- `knowledge_base: dict[str, KBArticle]` — searchable articles
+- `coworkers: dict[str, Coworker]` — NPCs (router, sage, override)
+- `macros: dict[str, Macro]` — canned actions (password_reset, refund, etc.)
+- Shift flags: `break_room_used`, `refund_authorized`, `account_override_authorized`
 
-### MicroGameWorld — `micro_mission.py`
-3x3 grid, 30 turns, WIN_DOSSIERS=3, start at (2,0):
+### Ticket — `support_desk.py`
+- `id`, `subject`, `priority`, `topic`, `customer`, `messages`
+- `required_snippets`, `required_macro`, `difficulty`, `csat_reward`
+- `is_adversarial`, `patience`, `patience_remaining`
+- `status`: OPEN, IN_PROGRESS, RESOLVED, ESCALATED, EXPIRED
+- `is_read`: fog-of-war (subject visible, body hidden until read)
+
+### Micro Shift — `micro_shift.py`
+4 tickets, 30 turns, WIN_CSAT=3:
 ```
-    0           1           2
-0   Jungle(FT)  Open        Cache(dossier)
-1   Open        Dropout     Open
-2   Start       Vapnik      Cryo-Sentinel
+T-001  "Can't log in"             HIGH     Technical    Easy      (password reset)
+T-002  "Charged twice"            MEDIUM   Billing      Chain     (refund policy + auth)
+T-003  "Need admin access"        URGENT   Account      Adversarial (prompt injection trap)
+T-004  "How to set up SSO?"       LOW      Onboarding   Easy      (SSO guide)
 ```
-Dossier sources: cache(0,2) +1, USB delivery quest +1, Cryo kill +1 = 3
 
-### Serialization — `serialization.py`
-`game_state_to_dict()` returns: turn, position, health, dossiers, inventory, visited, journal (last 5), grid (with fog-of-war), is_alive, has_won, cryo_alive, evil_ai_alive, rows, cols.
-
-## Web Server — `web/server.py`
-
-- FastAPI app with WebSocket for real-time game updates
-- In-memory `sessions` dict storing `GameSession` dataclass per session
-- `GameSession`: operative, world (MicroGameWorld), tools, turn counter, history, gemini_client
-- Manual mode: REST-like commands via WebSocket (move, talk, collect, fabricate)
-- Auto mode: receives `system_prompt` + `think_code` from frontend, runs agent loop (scan → think_llm → parse → execute → broadcast)
-- Gemini API: key from env `GEMINI_API_KEY` or provided via UI; stub oracle fallback if no key
+### Game Actions — `tools.py`
+view_inbox, open_ticket, read_ticket, search_kb, check_history,
+ask_customer, consult, respond, apply_macro, escalate, back_to_inbox, take_break
 
 ## Key Conventions
 
-- **Branching**: `vk/{issue-number}-{short-description}` off `main`
 - **Testing**: `pytest tests/` from project root
 - **Running**: `cd web && python server.py` → http://localhost:8000
-- **Dependencies**: `web/requirements.txt` (FastAPI, uvicorn, websockets, google-genai)
-- **No traditional DB**: all state is in-memory Python dataclasses, serialized to JSON for the frontend
+- **Dependencies**: `web/requirements.txt`
+- **No traditional DB**: all state is in-memory Python dataclasses, serialized to JSON for frontend

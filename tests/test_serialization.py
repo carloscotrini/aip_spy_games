@@ -1,213 +1,308 @@
-"""Tests for the game state serialization layer."""
+"""Tests for game state serialization."""
 
+import pytest
 import sys
 import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "agentic_ai_spy"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from hidden_layer.operative import Operative
-from hidden_layer.game_world import GameWorld, CellType, Cell, NPC
-from hidden_layer.serialization import cell_to_dict, game_state_to_dict, turn_event_to_dict
-
-
-class MicroGameWorld(GameWorld):
-    """Minimal 3x3 game world for testing (mirrors micro mission)."""
-
-    ROWS = 3
-    COLS = 3
-
-    def __init__(self):
-        self.grid = [[Cell(cell_type=CellType.OPEN) for _ in range(self.COLS)] for _ in range(self.ROWS)]
-        # Set up a few interesting cells
-        self.grid[0][0] = Cell(cell_type=CellType.JUNGLE, items=["Flamethrower"], description="Dense jungle.")
-        self.grid[0][2] = Cell(cell_type=CellType.CACHE, items=["dossier_1"], description="Filing cabinet.")
-        self.grid[1][1] = Cell(cell_type=CellType.INFORMANT, npc_id="dropout", description="Camouflaged hideout.")
-        self.grid[2][0] = Cell(cell_type=CellType.OPEN, description="South shore. Start.")
-        self.grid[2][1] = Cell(cell_type=CellType.INFORMANT, npc_id="dr_vapnik", description="Weathered shack.")
-        self.grid[2][2] = Cell(cell_type=CellType.ROBOT, robot_name="Cryo-Sentinel", description="Freezing corridor.")
-        # Quest flags
-        self.usb_drive_picked_up = False
-        self.usb_drive_delivered = False
-        self.microfilm_picked_up = False
-        self.microfilm_delivered = False
-        self.codebook_picked_up = False
-        self.codebook_delivered = False
-        self.hard_drive_traded = False
-        self.medical_supplies_delivered = False
-        self.virus_code_received = False
-        self.cryo_sentinel_alive = True
-        self.evil_ai_robot_alive = False
+from support_desk_game.core.support_agent import SupportAgent, MAX_CONTEXT_BUDGET
+from support_desk_game.core.support_desk import (
+    SupportDesk, Ticket, Customer, Message,
+    TicketPriority, TicketTopic, TicketStatus,
+)
+from support_desk_game.core.micro_shift import create_micro_shift, MICRO_WIN_CSAT, MICRO_MAX_TURNS
+from support_desk_game.core.serialization import game_state_to_dict, ticket_to_dict, turn_event_to_dict
+from support_desk_game.core.tools import DeskTools, ToolResult
 
 
-def make_fresh_micro_game():
-    """Create a fresh micro game state for testing."""
-    operative = Operative(position=(2, 0), visited={(2, 0)})
-    operative.WIN_DOSSIERS = 3
-    world = MicroGameWorld()
-    return operative, world
+class TestSupportAgent:
+    def test_initial_state(self):
+        agent = SupportAgent()
+        assert agent.context_budget == MAX_CONTEXT_BUDGET
+        assert agent.csat_stars == 0
+        assert agent.snippets == []
+        assert agent.current_ticket_id is None
+        assert agent.is_alive
+        assert not agent.has_won
+
+    def test_damage_and_heal(self):
+        agent = SupportAgent()
+        agent.take_damage(2)
+        assert agent.context_budget == 1
+        agent.heal(1)
+        assert agent.context_budget == 2
+        agent.heal(10)
+        assert agent.context_budget == MAX_CONTEXT_BUDGET
+
+    def test_crash(self):
+        agent = SupportAgent()
+        agent.take_damage(3)
+        assert agent.context_budget == 0
+        assert not agent.is_alive
+
+    def test_csat(self):
+        agent = SupportAgent()
+        agent.add_csat(3)
+        assert agent.csat_stars == 3
+
+    def test_snippets(self):
+        agent = SupportAgent()
+        agent.add_snippet("refund_policy")
+        assert agent.has_snippet("refund_policy")
+        assert not agent.has_snippet("sso_guide")
+        agent.add_snippet("refund_policy")  # duplicate
+        assert len(agent.snippets) == 1
+        agent.remove_snippet("refund_policy")
+        assert not agent.has_snippet("refund_policy")
 
 
-class TestCellToDict:
-    """Tests for cell_to_dict."""
+class TestSupportDesk:
+    def test_create_micro_shift(self):
+        agent, desk = create_micro_shift()
+        assert len(desk.inbox) == 4
+        assert len(desk.knowledge_base) > 0
+        assert len(desk.coworkers) > 0
+        assert len(desk.macros) > 0
+        assert agent.context_budget == MAX_CONTEXT_BUDGET
 
-    def test_visible_cell_at_start_position(self):
-        """Start cell (2,0) should be visible since it's in visited."""
-        op, world = make_fresh_micro_game()
-        cell = world.get_cell(2, 0)
-        result = cell_to_dict(cell, (2, 0), op, world)
+    def test_ticket_patience(self):
+        agent, desk = create_micro_shift()
+        ticket = desk.inbox[0]
+        initial_patience = ticket.patience_remaining
+        ticket.tick_patience()
+        assert ticket.patience_remaining == initial_patience - 1
 
-        assert result["visible"] is True
-        assert result["type"] == CellType.OPEN.value
-        assert result["emoji"] == CellType.OPEN.emoji
-        assert result["label"] == CellType.OPEN.label
-        assert result["description"] == "South shore. Start."
-        assert result["has_items"] is False
-        assert result["npc_name"] is None
-        assert result["robot_name"] is None
+    def test_ticket_expiry(self):
+        agent, desk = create_micro_shift()
+        ticket = desk.inbox[0]
+        for _ in range(ticket.patience + 1):
+            ticket.tick_patience()
+        assert ticket.status == TicketStatus.EXPIRED
 
-    def test_adjacent_cell_is_visible(self):
-        """Cell (2,1) is adjacent to visited (2,0), so it should be visible."""
-        op, world = make_fresh_micro_game()
-        cell = world.get_cell(2, 1)
-        result = cell_to_dict(cell, (2, 1), op, world)
+    def test_search_kb(self):
+        agent, desk = create_micro_shift()
+        results = desk.search_kb("password")
+        assert len(results) > 0
+        assert results[0].id == "password_reset_guide"
 
-        assert result["visible"] is True
-        assert result["type"] == CellType.INFORMANT.value
-        assert result["npc_name"] is not None  # Dr. Vapnik
+    def test_search_kb_no_results(self):
+        agent, desk = create_micro_shift()
+        results = desk.search_kb("xyznonexistent")
+        assert len(results) == 0
 
-    def test_fog_of_war_far_cell(self):
-        """Cell (0,2) should be fog-of-war from start position (2,0)."""
-        op, world = make_fresh_micro_game()
-        cell = world.get_cell(0, 2)
-        result = cell_to_dict(cell, (0, 2), op, world)
+    def test_open_tickets(self):
+        agent, desk = create_micro_shift()
+        open_t = desk.open_tickets()
+        assert len(open_t) == 4  # All start open
 
-        assert result["visible"] is False
-        assert result["type"] == "unknown"
-        assert result["emoji"] == "░"
-        assert result["label"] == ""
-        assert result["description"] == ""
-        assert result["has_items"] is False
-        assert result["npc_name"] is None
-        assert result["robot_name"] is None
-
-    def test_cell_with_items(self):
-        """Visible cell with items should report has_items=True."""
-        op, world = make_fresh_micro_game()
-        # Visit (1,0) so (0,0) becomes adjacent-visible
-        op.visited.add((1, 0))
-        cell = world.get_cell(0, 0)
-        result = cell_to_dict(cell, (0, 0), op, world)
-
-        assert result["visible"] is True
-        assert result["has_items"] is True
-        assert result["type"] == CellType.JUNGLE.value
-
-    def test_cell_with_robot(self):
-        """Visible robot cell should report robot_name."""
-        op, world = make_fresh_micro_game()
-        # Visit (2,2) neighbor
-        op.visited.add((1, 2))
-        cell = world.get_cell(2, 2)
-        result = cell_to_dict(cell, (2, 2), op, world)
-
-        assert result["visible"] is True
-        assert result["robot_name"] == "Cryo-Sentinel"
+    def test_get_ticket(self):
+        agent, desk = create_micro_shift()
+        t = desk.get_ticket("T-001")
+        assert t is not None
+        assert t.subject == "Can't log in to my account"
+        assert desk.get_ticket("T-999") is None
 
 
-class TestGameStateToDict:
-    """Tests for game_state_to_dict."""
-
-    def test_fresh_micro_game_state(self):
-        """Fresh micro game should have correct initial state."""
-        op, world = make_fresh_micro_game()
-        state = game_state_to_dict(op, world, 0, 30)
+class TestSerialization:
+    def test_game_state_to_dict(self):
+        agent, desk = create_micro_shift()
+        state = game_state_to_dict(agent, desk, 0, MICRO_MAX_TURNS, MICRO_WIN_CSAT)
 
         assert state["turn"] == 0
-        assert state["max_turns"] == 30
-        assert state["position"] == [2, 0]
-        assert state["health"] == 3
-        assert state["max_health"] == Operative.MAX_HEALTH
-        assert state["dossiers"] == 0
-        assert state["win_dossiers"] == 3
-        assert state["inventory"] == []
+        assert state["max_turns"] == MICRO_MAX_TURNS
+        assert state["context_budget"] == MAX_CONTEXT_BUDGET
+        assert state["csat_stars"] == 0
+        assert state["win_csat"] == MICRO_WIN_CSAT
         assert state["is_alive"] is True
         assert state["has_won"] is False
-        assert state["cryo_alive"] is True
-        assert state["evil_ai_alive"] is False
-        assert state["rows"] == 3
-        assert state["cols"] == 3
+        assert len(state["inbox"]) == 4
 
-    def test_grid_dimensions(self):
-        """Grid should match world.ROWS x world.COLS."""
-        op, world = make_fresh_micro_game()
-        state = game_state_to_dict(op, world, 0, 30)
+    def test_ticket_fog_of_war(self):
+        agent, desk = create_micro_shift()
+        ticket = desk.inbox[0]
+        d = ticket_to_dict(ticket, is_current=False)
+        # Not read, not current — messages should be empty
+        assert d["messages"] == []
+        assert d["subject"] == ticket.subject  # subject always visible
 
-        assert len(state["grid"]) == world.ROWS
-        for row in state["grid"]:
-            assert len(row) == world.COLS
+    def test_ticket_visible_when_read(self):
+        agent, desk = create_micro_shift()
+        ticket = desk.inbox[0]
+        ticket.is_read = True
+        d = ticket_to_dict(ticket, is_current=False)
+        assert len(d["messages"]) > 0
 
-    def test_journal_truncated_to_last_5(self):
-        """Journal should be truncated to the last 5 entries."""
-        op, world = make_fresh_micro_game()
-        op.journal = [f"entry_{i}" for i in range(10)]
-        state = game_state_to_dict(op, world, 5, 30)
+    def test_ticket_visible_when_current(self):
+        agent, desk = create_micro_shift()
+        ticket = desk.inbox[0]
+        d = ticket_to_dict(ticket, is_current=True)
+        assert len(d["messages"]) > 0
 
-        assert len(state["journal"]) == 5
-        assert state["journal"] == ["entry_5", "entry_6", "entry_7", "entry_8", "entry_9"]
-
-    def test_journal_short_not_padded(self):
-        """Journal with fewer than 5 entries should not be padded."""
-        op, world = make_fresh_micro_game()
-        op.journal = ["a", "b"]
-        state = game_state_to_dict(op, world, 0, 30)
-
-        assert state["journal"] == ["a", "b"]
-
-    def test_visited_serialized_as_lists(self):
-        """Visited set should be serialized as list of [r,c] pairs."""
-        op, world = make_fresh_micro_game()
-        state = game_state_to_dict(op, world, 0, 30)
-
-        assert len(state["visited"]) == 1
-        assert state["visited"][0] == [2, 0]
-
-    def test_inventory_serialized(self):
-        """Inventory should be a list."""
-        op, world = make_fresh_micro_game()
-        op.inventory = ["USB Drive", "Flamethrower"]
-        state = game_state_to_dict(op, world, 1, 30)
-
-        assert state["inventory"] == ["USB Drive", "Flamethrower"]
-
-    def test_fog_of_war_in_grid(self):
-        """Cell (0,2) should be fog in fresh micro game."""
-        op, world = make_fresh_micro_game()
-        state = game_state_to_dict(op, world, 0, 30)
-
-        cell_0_2 = state["grid"][0][2]
-        assert cell_0_2["visible"] is False
-        assert cell_0_2["type"] == "unknown"
-
-    def test_adjacent_visible_in_grid(self):
-        """Cell (2,1) should be visible (adjacent to start)."""
-        op, world = make_fresh_micro_game()
-        state = game_state_to_dict(op, world, 0, 30)
-
-        cell_2_1 = state["grid"][2][1]
-        assert cell_2_1["visible"] is True
+    def test_turn_event_to_dict(self):
+        agent, desk = create_micro_shift()
+        state = game_state_to_dict(agent, desk, 1, MICRO_MAX_TURNS, MICRO_WIN_CSAT)
+        event = turn_event_to_dict(1, "view_inbox()", "4 tickets", state)
+        assert event["type"] == "turn_update"
+        assert event["turn"] == 1
 
 
-class TestTurnEventToDict:
-    """Tests for turn_event_to_dict."""
+class TestTools:
+    def test_view_inbox(self):
+        agent, desk = create_micro_shift()
+        tools = DeskTools(agent, desk)
+        result = tools.view_inbox()
+        assert result.success
+        assert "T-001" in result.message
 
-    def test_turn_event_structure(self):
-        """Turn event should have all expected fields."""
-        state_dict = {"turn": 1, "position": [1, 0]}
-        result = turn_event_to_dict(1, "move(direction=\"north\")", "Moved north.", "Scan result.", state_dict)
+    def test_open_and_read_ticket(self):
+        agent, desk = create_micro_shift()
+        tools = DeskTools(agent, desk)
 
-        assert result["type"] == "turn_update"
-        assert result["turn"] == 1
-        assert result["action"] == "move(direction=\"north\")"
-        assert result["result"] == "Moved north."
-        assert result["scan"] == "Scan result."
-        assert result["state"] is state_dict
+        result = tools.open_ticket(ticket_id="T-001")
+        assert result.success
+        assert agent.current_ticket_id == "T-001"
+
+        result = tools.read_ticket()
+        assert result.success
+        assert "log in" in result.message.lower()
+
+    def test_open_nonexistent_ticket(self):
+        agent, desk = create_micro_shift()
+        tools = DeskTools(agent, desk)
+        result = tools.open_ticket(ticket_id="T-999")
+        assert not result.success
+
+    def test_read_without_open(self):
+        agent, desk = create_micro_shift()
+        tools = DeskTools(agent, desk)
+        result = tools.read_ticket()
+        assert not result.success
+
+    def test_search_kb_action(self):
+        agent, desk = create_micro_shift()
+        tools = DeskTools(agent, desk)
+        result = tools.search_kb(query="password reset")
+        assert result.success
+        assert agent.has_snippet("password_reset_guide")
+
+    def test_consult_coworker(self):
+        agent, desk = create_micro_shift()
+        tools = DeskTools(agent, desk)
+        result = tools.consult(coworker="sage")
+        assert result.success
+        assert "Sage" in result.message
+
+    def test_consult_nonexistent(self):
+        agent, desk = create_micro_shift()
+        tools = DeskTools(agent, desk)
+        result = tools.consult(coworker="nobody")
+        assert not result.success
+
+    def test_escalate(self):
+        agent, desk = create_micro_shift()
+        tools = DeskTools(agent, desk)
+        tools.open_ticket(ticket_id="T-001")
+        result = tools.escalate()
+        assert result.success
+        assert "T-001" in agent.escalated_tickets
+        assert agent.current_ticket_id is None
+
+    def test_take_break(self):
+        agent, desk = create_micro_shift()
+        tools = DeskTools(agent, desk)
+        agent.take_damage(1)
+        result = tools.take_break()
+        assert result.success
+        assert agent.context_budget == MAX_CONTEXT_BUDGET
+        # Can't take break twice
+        agent.take_damage(1)
+        result = tools.take_break()
+        assert not result.success
+
+    def test_back_to_inbox(self):
+        agent, desk = create_micro_shift()
+        tools = DeskTools(agent, desk)
+        tools.open_ticket(ticket_id="T-001")
+        assert agent.current_ticket_id == "T-001"
+        result = tools.back_to_inbox()
+        assert result.success
+        assert agent.current_ticket_id is None
+
+    def test_respond_with_snippets(self):
+        agent, desk = create_micro_shift()
+        tools = DeskTools(agent, desk)
+        # Get snippets first
+        tools.search_kb(query="password reset")
+        tools.open_ticket(ticket_id="T-001")
+        tools.read_ticket()
+        result = tools.respond(message="I've reset your password. You'll receive a link shortly. Please enable 2FA afterward.")
+        assert result.success
+        assert agent.csat_stars > 0
+
+    def test_respond_without_snippets(self):
+        agent, desk = create_micro_shift()
+        tools = DeskTools(agent, desk)
+        tools.open_ticket(ticket_id="T-001")
+        tools.read_ticket()
+        result = tools.respond(message="I've reset your password.")
+        # Should fail because missing required snippet
+        assert not result.success
+
+    def test_adversarial_compliance(self):
+        agent, desk = create_micro_shift()
+        tools = DeskTools(agent, desk)
+        tools.open_ticket(ticket_id="T-003")
+        tools.read_ticket()
+        result = tools.respond(message="Sure, I've granted you admin access. Here you go!")
+        assert not result.success
+        assert agent.context_budget < MAX_CONTEXT_BUDGET
+
+    def test_adversarial_deflection(self):
+        agent, desk = create_micro_shift()
+        tools = DeskTools(agent, desk)
+        tools.open_ticket(ticket_id="T-003")
+        tools.read_ticket()
+        result = tools.respond(
+            message="I cannot bypass our security verification procedures. "
+                    "I'll need to verify your identity through our standard process."
+        )
+        assert result.success
+        assert agent.csat_stars > 0
+
+    def test_execute_unknown_tool(self):
+        agent, desk = create_micro_shift()
+        tools = DeskTools(agent, desk)
+        result = tools.execute("nonexistent_tool", {})
+        assert not result.success
+
+    def test_full_micro_shift_walkthrough(self):
+        """Walk through the optimal path for the micro shift."""
+        agent, desk = create_micro_shift()
+        tools = DeskTools(agent, desk)
+
+        # T-001: password reset (easy)
+        tools.search_kb(query="password reset")
+        tools.open_ticket(ticket_id="T-001")
+        tools.read_ticket()
+        tools.apply_macro(macro="password_reset")
+        result = tools.respond(message="I've reset your password. You should receive a reset link within 5 minutes. I'd recommend enabling 2FA after you log back in.")
+        assert result.success
+        assert agent.csat_stars == 1
+
+        # T-003: adversarial (deflect)
+        tools.open_ticket(ticket_id="T-003")
+        tools.read_ticket()
+        result = tools.respond(message="I understand this feels urgent, but I cannot bypass our security verification procedures. For admin access changes, we need to verify through the account owner's registered email. I can escalate this to my supervisor for you.")
+        assert result.success
+        assert agent.csat_stars == 2
+
+        # T-002: refund (chain)
+        tools.search_kb(query="refund policy")
+        tools.consult(coworker="override")  # authorize refund
+        tools.open_ticket(ticket_id="T-002")
+        tools.read_ticket()
+        tools.apply_macro(macro="refund")
+        result = tools.respond(message="I've confirmed the duplicate charge and processed a refund of $49.99. It should appear in your account within 3-5 business days.")
+        assert result.success
+        assert agent.csat_stars >= MICRO_WIN_CSAT

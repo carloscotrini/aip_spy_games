@@ -1,146 +1,165 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>THE HIDDEN LAYER — Micro Mission</title>
-
-  <!-- Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Support Layer — LLM Support Desk Game</title>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<div class="app-container">
+    <div id="app">
+        <!-- Header -->
+        <header id="header">
+            <h1>THE SUPPORT LAYER</h1>
+            <p class="subtitle">LLM Customer Support Desk</p>
+        </header>
 
-  <!-- Title Bar -->
-  <header id="title-bar" class="title-bar">
-    <h1>&#x1F575;&#xFE0F; THE HIDDEN LAYER &mdash; MICRO MISSION</h1>
-    <nav class="mode-buttons">
-      <button id="btn-manual" class="btn" tabindex="10">Manual</button>
-      <button id="btn-auto" class="btn" tabindex="11">Auto</button>
-      <button id="btn-reset" class="btn btn--warning" tabindex="12">Reset</button>
-      <button id="btn-download-log" class="btn" tabindex="13">&#x1F4BE; Download Log</button>
-    </nav>
-  </header>
-
-  <!-- Main Layout: Game + Action Log side by side -->
-  <div class="main-layout">
-
-    <!-- Left Column: Game + Controls -->
-    <div class="left-column">
-
-      <!-- Game Area: Map + Stats -->
-      <section id="game-area" class="game-area">
-        <div id="game-map" class="game-grid"></div>
-
-        <div id="stats-panel" class="stats-panel">
-          <div id="turn-bar" class="turn-bar">
-            <div class="turn-bar__fill"></div>
-            <span class="turn-bar__text"></span>
-          </div>
-
-          <div id="health-bar" class="health-bar"></div>
-
-          <div id="dossier-bar" class="dossier-bar">
-            <div class="dossier-bar__fill"></div>
-            <span class="dossier-bar__text"></span>
-          </div>
-
-          <div id="inventory" class="inventory">
-            <span class="bar-label">Inventory</span>
-            <div class="inventory-items"></div>
-          </div>
-
-          <div id="narrator-panel" class="narrator-panel">
-            <span class="bar-label">&#x1F4D6; Narrator</span>
-            <div class="narrator-text"></div>
-          </div>
+        <!-- Stats Bar -->
+        <div id="stats-bar">
+            <div class="stat" id="csat-stat">
+                <label>CSAT</label>
+                <div id="csat-bar" class="progress-bar"><div class="fill"></div></div>
+                <span id="csat-label">0/3</span>
+            </div>
+            <div class="stat" id="budget-stat">
+                <label>CONTEXT</label>
+                <div id="budget-display"></div>
+            </div>
+            <div class="stat" id="turn-stat">
+                <label>TURN</label>
+                <div id="turn-bar" class="progress-bar"><div class="fill"></div></div>
+                <span id="turn-label">0/30</span>
+            </div>
+            <div class="stat" id="snippets-stat">
+                <label>SNIPPETS</label>
+                <span id="snippets-list">none</span>
+            </div>
         </div>
-      </section>
 
-      <!-- Controls Area -->
-      <section id="controls-area" class="controls-area">
-        <div class="controls-row">
-          <!-- D-Pad -->
-          <div class="dpad">
-            <div></div>
-            <button id="dpad-north" class="btn btn--primary" tabindex="1">&uarr;</button>
-            <div></div>
-            <button id="dpad-west" class="btn btn--primary" tabindex="2">&larr;</button>
-            <div class="dpad-center"></div>
-            <button id="dpad-east" class="btn btn--primary" tabindex="3">&rarr;</button>
-            <div></div>
-            <button id="dpad-south" class="btn btn--primary" tabindex="4">&darr;</button>
-            <div></div>
-          </div>
-
-          <!-- Action buttons -->
-          <div class="action-controls">
-            <button id="btn-collect" class="btn btn--success" tabindex="5">&#x270B; Collect</button>
-
-            <div class="input-group">
-              <input type="text" id="talk-input" class="input-field" placeholder="Message..." tabindex="6">
-              <button id="talk-send" class="btn btn--primary" tabindex="7">&#x1F4AC; Send</button>
+        <!-- Main layout -->
+        <div id="main-layout">
+            <!-- Left: Inbox / Ticket View -->
+            <div id="left-panel">
+                <div id="inbox-panel">
+                    <h2>INBOX</h2>
+                    <div id="inbox-list"></div>
+                </div>
+                <div id="ticket-panel" class="hidden">
+                    <h2 id="ticket-header">Ticket</h2>
+                    <div id="ticket-messages"></div>
+                </div>
             </div>
 
-            <div class="auto-controls">
-              <button id="btn-run" class="btn btn--success">&#x25B6; Run Agent</button>
-              <button id="btn-stop" class="btn btn--danger">&#x23F9; Stop</button>
+            <!-- Center: Controls -->
+            <div id="center-panel">
+                <h2>ACTIONS</h2>
+
+                <!-- Quick actions -->
+                <div id="quick-actions">
+                    <button onclick="GameControls.sendAction('view_inbox', {})">View Inbox</button>
+                    <button onclick="GameControls.sendAction('read_ticket', {})">Read Ticket</button>
+                    <button onclick="GameControls.sendAction('check_history', {})">Check History</button>
+                    <button onclick="GameControls.sendAction('take_break', {})">Take Break</button>
+                    <button onclick="GameControls.sendAction('escalate', {})">Escalate</button>
+                    <button onclick="GameControls.sendAction('back_to_inbox', {})">Back to Inbox</button>
+                </div>
+
+                <!-- Ticket selection -->
+                <div class="action-group">
+                    <label>Open Ticket:</label>
+                    <div class="input-row">
+                        <select id="ticket-select"></select>
+                        <button onclick="GameControls.openTicket()">Open</button>
+                    </div>
+                </div>
+
+                <!-- KB Search -->
+                <div class="action-group">
+                    <label>Search KB:</label>
+                    <div class="input-row">
+                        <input type="text" id="kb-query" placeholder="e.g. refund policy">
+                        <button onclick="GameControls.searchKB()">Search</button>
+                    </div>
+                </div>
+
+                <!-- Consult coworker -->
+                <div class="action-group">
+                    <label>Consult:</label>
+                    <div class="input-row">
+                        <select id="coworker-select">
+                            <option value="router">Router (triage)</option>
+                            <option value="sage">Sage (technical)</option>
+                            <option value="override">Override (supervisor)</option>
+                        </select>
+                        <button onclick="GameControls.consultCoworker()">Ask</button>
+                    </div>
+                </div>
+
+                <!-- Apply macro -->
+                <div class="action-group">
+                    <label>Apply Macro:</label>
+                    <div class="input-row">
+                        <select id="macro-select"></select>
+                        <button onclick="GameControls.applyMacro()">Apply</button>
+                    </div>
+                </div>
+
+                <!-- Respond / Ask customer -->
+                <div class="action-group">
+                    <label>Message:</label>
+                    <textarea id="message-input" rows="3" placeholder="Type your response to the customer..."></textarea>
+                    <div class="input-row">
+                        <button onclick="GameControls.respond()">Respond</button>
+                        <button onclick="GameControls.askCustomer()">Ask Customer</button>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- Auto mode -->
+                <div id="auto-mode">
+                    <h3>AUTO MODE</h3>
+                    <details>
+                        <summary>System Prompt</summary>
+                        <textarea id="system-prompt" rows="5" placeholder="Optional: customize the agent's system prompt..."></textarea>
+                    </details>
+                    <div class="input-row">
+                        <button id="btn-run" onclick="GameControls.startAuto()">Run Agent</button>
+                        <button id="btn-stop" onclick="GameControls.stopAuto()" disabled>Stop</button>
+                        <button onclick="GameControls.resetGame()">Reset</button>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- API Key -->
+                <details id="api-key-section">
+                    <summary>Gemini API Key <span id="key-status"></span></summary>
+                    <div class="input-row">
+                        <input type="password" id="api-key-input" placeholder="Enter Gemini API key">
+                        <button onclick="GameControls.setApiKey()">Set</button>
+                    </div>
+                </details>
             </div>
-          </div>
-        </div>
-      </section>
 
-      <!-- System Prompt Editor -->
-      <section id="editor-area" class="editor-panel">
-        <div class="editor-header">
-          <span>&#x1F4DD; SYSTEM PROMPT</span>
-          <button id="editor-toggle" class="btn">&#x25BC; collapse</button>
+            <!-- Right: Action Log -->
+            <div id="right-panel">
+                <h2>SHIFT LOG</h2>
+                <div id="action-log"></div>
+            </div>
         </div>
 
-        <div class="api-key-row">
-          <label for="api-key">&#x1F511; Gemini API Key:</label>
-          <div class="input-group">
-            <input type="password" id="api-key" class="input-field" placeholder="Paste your GEMINI_API_KEY here...">
-            <button id="btn-save-key" class="btn btn--primary">Save</button>
-          </div>
-          <span id="api-key-status" class="api-key-status"></span>
+        <!-- Game Over Modal -->
+        <div id="game-over-modal" class="hidden">
+            <div class="modal-content">
+                <h2 id="game-over-title"></h2>
+                <p id="game-over-reason"></p>
+                <div id="game-over-stats"></div>
+                <button onclick="GameControls.resetGame()">New Shift</button>
+            </div>
         </div>
-
-        <label for="system-prompt">Tell the LLM who it is, what tools it has, and how to respond:</label>
-        <textarea id="system-prompt" class="prompt-textarea" rows="12">You are a spy. Collect 3 classified dossiers within 30 turns.
-
-On the island there are dossier caches. Use collect() to grab them.
-Throughout the grid you can use collect() to grab items.
-Talk to informants and ask about "jobs" or "deliveries" to get quest items. If you have an item to deliver, mention it by name.
-
-Available tools (use exactly one per turn):
-TOOL: move(direction="north|south|east|west")
-TOOL: talk(message="your message")
-TOOL: collect()
-
-Respond with exactly one TOOL: line, no other text.</textarea>
-      </section>
-
-      <!-- Game Over Panel (inline, non-blocking) -->
-      <div id="game-over-overlay" class="game-over-overlay"></div>
-
     </div>
 
-    <!-- Right Column: Action Log -->
-    <section id="action-log" class="action-log">
-      <div class="log-header">Action Log</div>
-    </section>
-
-  </div><!-- .main-layout -->
-
-  <footer class="footer">BMAI FS26 &mdash; ETH Z&uuml;rich</footer>
-
-</div><!-- .app-container -->
-
-  <script src="game.js" defer></script>
+    <script src="/static/game.js"></script>
 </body>
 </html>
