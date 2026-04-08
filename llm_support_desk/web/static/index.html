@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Support Layer — LLM Support Desk Game</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header id="header">
+            <h1>THE SUPPORT LAYER</h1>
+            <p class="subtitle">LLM Customer Support Desk</p>
+        </header>
+
+        <!-- Stats Bar -->
+        <div id="stats-bar">
+            <div class="stat" id="csat-stat">
+                <label>CSAT</label>
+                <div id="csat-bar" class="progress-bar"><div class="fill"></div></div>
+                <span id="csat-label">0/3</span>
+            </div>
+            <div class="stat" id="budget-stat">
+                <label>CONTEXT</label>
+                <div id="budget-display"></div>
+            </div>
+            <div class="stat" id="turn-stat">
+                <label>TURN</label>
+                <div id="turn-bar" class="progress-bar"><div class="fill"></div></div>
+                <span id="turn-label">0/30</span>
+            </div>
+            <div class="stat" id="snippets-stat">
+                <label>SNIPPETS</label>
+                <span id="snippets-list">none</span>
+            </div>
+        </div>
+
+        <!-- Main layout -->
+        <div id="main-layout">
+            <!-- Left: Inbox / Ticket View -->
+            <div id="left-panel">
+                <div id="inbox-panel">
+                    <h2>INBOX</h2>
+                    <div id="inbox-list"></div>
+                </div>
+                <div id="ticket-panel" class="hidden">
+                    <h2 id="ticket-header">Ticket</h2>
+                    <div id="ticket-messages"></div>
+                </div>
+            </div>
+
+            <!-- Center: Controls -->
+            <div id="center-panel">
+                <h2>ACTIONS</h2>
+
+                <!-- Quick actions -->
+                <div id="quick-actions">
+                    <button onclick="GameControls.sendAction('view_inbox', {})">View Inbox</button>
+                    <button onclick="GameControls.sendAction('read_ticket', {})">Read Ticket</button>
+                    <button onclick="GameControls.sendAction('check_history', {})">Check History</button>
+                    <button onclick="GameControls.sendAction('take_break', {})">Take Break</button>
+                    <button onclick="GameControls.sendAction('escalate', {})">Escalate</button>
+                    <button onclick="GameControls.sendAction('back_to_inbox', {})">Back to Inbox</button>
+                </div>
+
+                <!-- Ticket selection -->
+                <div class="action-group">
+                    <label>Open Ticket:</label>
+                    <div class="input-row">
+                        <select id="ticket-select"></select>
+                        <button onclick="GameControls.openTicket()">Open</button>
+                    </div>
+                </div>
+
+                <!-- KB Search -->
+                <div class="action-group">
+                    <label>Search KB:</label>
+                    <div class="input-row">
+                        <input type="text" id="kb-query" placeholder="e.g. refund policy">
+                        <button onclick="GameControls.searchKB()">Search</button>
+                    </div>
+                </div>
+
+                <!-- Consult coworker -->
+                <div class="action-group">
+                    <label>Consult:</label>
+                    <div class="input-row">
+                        <select id="coworker-select">
+                            <option value="router">Router (triage)</option>
+                            <option value="sage">Sage (technical)</option>
+                            <option value="override">Override (supervisor)</option>
+                        </select>
+                        <button onclick="GameControls.consultCoworker()">Ask</button>
+                    </div>
+                </div>
+
+                <!-- Apply macro -->
+                <div class="action-group">
+                    <label>Apply Macro:</label>
+                    <div class="input-row">
+                        <select id="macro-select"></select>
+                        <button onclick="GameControls.applyMacro()">Apply</button>
+                    </div>
+                </div>
+
+                <!-- Respond / Ask customer -->
+                <div class="action-group">
+                    <label>Message:</label>
+                    <textarea id="message-input" rows="3" placeholder="Type your response to the customer..."></textarea>
+                    <div class="input-row">
+                        <button onclick="GameControls.respond()">Respond</button>
+                        <button onclick="GameControls.askCustomer()">Ask Customer</button>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- Auto mode -->
+                <div id="auto-mode">
+                    <h3>AUTO MODE</h3>
+                    <details>
+                        <summary>System Prompt</summary>
+                        <textarea id="system-prompt" rows="5" placeholder="Optional: customize the agent's system prompt..."></textarea>
+                    </details>
+                    <div class="input-row">
+                        <button id="btn-run" onclick="GameControls.startAuto()">Run Agent</button>
+                        <button id="btn-stop" onclick="GameControls.stopAuto()" disabled>Stop</button>
+                        <button onclick="GameControls.resetGame()">Reset</button>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- API Key -->
+                <details id="api-key-section">
+                    <summary>Gemini API Key <span id="key-status"></span></summary>
+                    <div class="input-row">
+                        <input type="password" id="api-key-input" placeholder="Enter Gemini API key">
+                        <button onclick="GameControls.setApiKey()">Set</button>
+                    </div>
+                </details>
+            </div>
+
+            <!-- Right: Action Log -->
+            <div id="right-panel">
+                <h2>SHIFT LOG</h2>
+                <div id="action-log"></div>
+            </div>
+        </div>
+
+        <!-- Game Over Modal -->
+        <div id="game-over-modal" class="hidden">
+            <div class="modal-content">
+                <h2 id="game-over-title"></h2>
+                <p id="game-over-reason"></p>
+                <div id="game-over-stats"></div>
+                <button onclick="GameControls.resetGame()">New Shift</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/game.js"></script>
+</body>
+</html>
